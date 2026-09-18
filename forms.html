@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forms · Liferay Component Guide</title>
+<meta name="description" content="How visitors put data into Liferay. A Form Container bound to an Object, filled with input fragments — plus the rules that make a public form actually work.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+	<strong><a href="index.html">Liferay Component Guide</a></strong>
+	<span>DXP 2026.Q2 &middot; what each piece is, and when to reach for it</span>
+</header>
+<div class="shell">
+	<nav class="sidebar" aria-label="Components">
+			<h4>Start here</h4>
+			<ul>
+				<li><a href="index.html">Overview & map</a></li>
+				<li><a href="decision-guide.html">What should I use?</a></li>
+			</ul>
+			<h4>Content</h4>
+			<ul>
+				<li><a href="web-content.html">Web Content (articles)</a></li>
+				<li><a href="content-structures.html">Content Structures</a></li>
+				<li><a href="web-content-templates.html">Web Content Templates</a></li>
+				<li><a href="documents-media.html">Documents & Media</a></li>
+				<li><a href="taxonomy.html">Categories, Tags & Assets</a></li>
+			</ul>
+			<h4>Pages & layout</h4>
+			<ul>
+				<li><a href="pages.html">Pages & page types</a></li>
+				<li><a href="fragments.html">Fragments</a></li>
+				<li><a href="collections.html">Collections</a></li>
+				<li><a href="templates.html">All template types</a></li>
+				<li><a href="theme-design.html">Themes & style books</a></li>
+				<li><a href="personalization.html">Segments & experiences</a></li>
+			</ul>
+			<h4>Data & logic</h4>
+			<ul>
+				<li><a href="objects.html">Objects</a></li>
+				<li><a aria-current="page" href="forms.html">Forms</a></li>
+				<li><a href="workflow.html">Workflow & notifications</a></li>
+				<li><a href="permissions.html">Roles & permissions</a></li>
+			</ul>
+			<h4>Extend & integrate</h4>
+			<ul>
+				<li><a href="client-extensions.html">Client extensions</a></li>
+				<li><a href="widgets-modules.html">Widgets & OSGi modules</a></li>
+				<li><a href="headless-apis.html">Headless APIs</a></li>
+				<li><a href="site-initializers.html">Site initializers</a></li>
+			</ul>
+	</nav>
+	<main id="main">
+		<h1>Forms</h1>
+		<p class="lede">How visitors put data into Liferay. A Form Container bound to an Object, filled with input fragments — plus the rules that make a public form actually work.</p>
+
+<h2>In one sentence</h2>
+<p>A modern Liferay form is a <b>Form Container</b> page element bound to an <a href="objects.html">Object definition</a>, containing <b>input fragments</b> each bound to one object field, plus a submit button. Submitting creates an object entry.</p>
+
+<h2>The composition</h2>
+<pre><code>{
+	"definition": {
+		"formConfig": {
+			"formReference": { "className": "[$OBJECT_DEFINITION_CLASS_NAME:PolicyRequest$]", "classType": 0 }
+		},
+		"layout": { "widthType": "Fluid" }
+	},
+	"type": "Form",
+	"pageElements": [
+		{ "definition": { "fragment": { "key": "INPUTS-text-input" },
+			"fragmentConfig": { "inputFieldId": "ObjectField_subject" } }, "type": "Fragment" },
+		{ "definition": { "fragment": { "key": "INPUTS-select-from-list" },
+			"fragmentConfig": { "inputFieldId": "ObjectField_requestStatus" } }, "type": "Fragment" },
+		{ "definition": { "fragment": { "key": "INPUTS-submit-button" },
+			"fragmentConfig": { "buttonSize": "nm", "buttonType": "primary" } }, "type": "Fragment" }
+	]
+}</code></pre>
+<p>Two conventions carry the whole thing: the container names the object by <b>class name token</b>, and every input names its field as <code>ObjectField_&lt;fieldName&gt;</code>.</p>
+
+<h3>Built-in input fragments</h3>
+<div class="wrap"><table>
+	<tr><th>Key</th><th>Binds to</th></tr>
+	<tr><td><code>INPUTS-text-input</code></td><td>Text, LongText, Integer, Decimal, Email</td></tr>
+	<tr><td><code>INPUTS-select-from-list</code></td><td><a href="objects.html#picklists">Picklist</a> fields <b>and relationship fields</b></td></tr>
+	<tr><td><code>INPUTS-date-input</code></td><td>Date / DateTime</td></tr>
+	<tr><td><code>INPUTS-checkbox</code>, <code>INPUTS-radio</code></td><td>Boolean, small enumerations</td></tr>
+	<tr><td><code>INPUTS-attachment</code></td><td>Attachment fields</td></tr>
+	<tr><td><code>INPUTS-captcha</code></td><td>CAPTCHA verification</td></tr>
+	<tr><td><code>INPUTS-submit-button</code></td><td>Submits the container</td></tr>
+</table></div>
+<p>A relationship field is selected exactly like a picklist &mdash; <code>inputFieldId: "ObjectField_r_ticketToProject_c_projectId"</code> gives the visitor a picker over the related object's entries.</p>
+
+<h2>Custom input fragments</h2>
+<p>When the built-in inputs are not enough &mdash; a stepper, a card picker, a dependent dropdown &mdash; write a <a href="fragments.html#types">fragment of type <b>input</b></a>. It declares which field type it accepts and Liferay handles the binding and submission; you own the markup and behaviour.</p>
+<div class="callout note">
+	<b>Custom inputs must live inside a Form Container</b>
+	<p>An input fragment placed outside a container has nothing to bind to. It will render, and it will submit nothing.</p>
+</div>
+
+<h2>Forms vs the older Forms application</h2>
+<div class="wrap"><table>
+	<tr><th></th><th>Form Container + Object</th><th>Legacy Forms widget (DDM)</th></tr>
+	<tr><td>Data lands in</td><td>An <a href="objects.html">Object</a> &mdash; queryable, related, permissioned</td><td>A form-record store</td></tr>
+	<tr><td>Layout control</td><td>Full page editor, your own fragments</td><td>Form builder only</td></tr>
+	<tr><td>Reporting</td><td>Object admin UI, REST, <a href="collections.html">collections</a></td><td>Export CSV</td></tr>
+	<tr><td>Logic on submit</td><td><a href="workflow.html#actions">Object actions</a>, <a href="workflow.html">workflow</a>, CETs</td><td>Limited</td></tr>
+	<tr><td>Recommended</td><td><b>Yes</b></td><td>Only for existing forms</td></tr>
+</table></div>
+
+<h2>Public forms &mdash; the rules that matter</h2>
+<p>A form open to anonymous visitors has a specific permission shape, and getting it wrong either breaks the form or leaks data.</p>
+<div class="wrap"><table>
+	<tr><th>Grant to Guest</th><th>On resource</th><th>Verdict</th></tr>
+	<tr><td><code>ADD_OBJECT_ENTRY</code></td><td><code>com.liferay.object#[$OBJECT_DEFINITION_ID:X$]</code></td><td><b>Required</b> &mdash; without it, submission fails</td></tr>
+	<tr><td><code>VIEW</code></td><td><code>[$OBJECT_DEFINITION_CLASS_NAME:X$]</code></td><td><b>Do not grant</b> at company scope &mdash; it publishes every submission to the world</td></tr>
+	<tr><td><code>UPDATE</code>, <code>DELETE</code>, <code>PERMISSIONS</code></td><td>either</td><td>Ungrantable to Guest at any scope</td></tr>
+</table></div>
+<p>So a public form is <b>write-only</b>: visitors can submit, and cannot read back the collection. Full detail on <a href="permissions.html#guest">Guest access</a>.</p>
+
+<h3>Handling the response correctly</h3>
+<p>The visitor's own <code>POST</code> <b>does</b> return the created entry &mdash; complete body, HTTP 200, even with no VIEW. So confirm back what was recorded rather than coding around an absent body. Guard the parse, though, because a 500 or a proxy error may return HTML:</p>
+<pre><code>const response = await fetch(`/o/c/policyrequests`, {
+	body: JSON.stringify(payload),
+	headers: {'Content-Type': 'application/json'},
+	method: 'POST'
+});
+
+const raw = await response.text();
+let body;
+
+try {
+	body = JSON.parse(raw);
+}
+catch (error) {
+	throw new Error(`Unexpected response (HTTP ${response.status})`);
+}
+
+if (!response.ok) {
+	throw new Error(body.title || body.detail || `HTTP ${response.status}`);
+}</code></pre>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="objects.html">Objects &mdash; where submissions land</a></li>
+	<li><a href="fragments.html">Fragments &mdash; the inputs</a></li>
+	<li><a href="pages.html">Pages &mdash; where the container sits</a></li>
+	<li><a href="workflow.html">Workflow &mdash; approval after submit</a></li>
+	<li><a href="permissions.html#guest">Guest access &mdash; the rules above</a></li>
+	<li><a href="objects.html#aggregation">Aggregation fields &mdash; counting submissions safely</a></li>
+</ul>
+
+<h2>Traps</h2>
+<div class="callout trap">
+	<b>A picklist fetched from public JS renders empty</b>
+	<p>Guest gets <b>403</b> on the list-type endpoint regardless of grants. The <code>&lt;select&gt;</code> renders with no options, the visitor submits blank, and the entry saves looking fine. Ship options in the fragment markup; let any fetch merely refresh them.</p>
+</div>
+<div class="callout trap">
+	<b>A silently ignored relationship key</b>
+	<p>If the form writes the FK by hand, the key is <code>r_&lt;relationshipName&gt;_c_&lt;parent&gt;Id</code> &mdash; named for the <em>parent</em>, on the <em>child</em>. A wrong key is ignored, the FK stays <code>0</code>, and the POST returns 200. The submission looks successful and is orphaned.</p>
+</div>
+<div class="callout warn">
+	<b>Do not show counts or totals from the form's own object</b>
+	<p>"142 people have registered" computed in the browser reads <code>0</code> for Guest. Put the number on a readable parent object via an <a href="objects.html#aggregation">Aggregation field</a>.</p>
+</div>
+		<footer class="pagefoot">
+			Part of the <a href="index.html">Liferay Component Guide</a>.
+			Not sure which component fits? Start at <a href="decision-guide.html">What should I use?</a>
+		</footer>
+	</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!--title: Objects-->
+<!--subtitle: Your own database tables, with a REST API, permissions, relationships, validation and lifecycle logic — defined without writing Java.-->
+
+<h2>In one sentence</h2>
+<p>An <b>Object</b> is a custom data model. You define fields, relationships and rules; Liferay creates the table, generates a REST API at <code>/o/c/&lt;pluralLabel&gt;</code>, gives you an admin UI, and wires it into <a href="collections.html">collections</a>, <a href="forms.html">forms</a>, <a href="workflow.html">workflow</a>, search and <a href="permissions.html">permissions</a>.</p>
+
+<h2>What you get when you publish one</h2>
+<div class="ascii">  Object definition "Policy"
+        │
+        ├─▶ a real database table
+        ├─▶ REST: GET/POST/PUT/PATCH/DELETE  /o/c/policies  (+ OData filter, sort, page)
+        ├─▶ an admin application in the Control Panel
+        ├─▶ a collection provider (usable in any Collection Display)
+        ├─▶ a form target (Form Container binds to it)
+        ├─▶ a display page template binding (one URL per entry)
+        ├─▶ permission resources (VIEW / UPDATE / DELETE / ADD_OBJECT_ENTRY)
+        └─▶ search indexing + workflow support</div>
+<p>That is a lot of platform for one definition, and it is the reason Objects are the default answer for anything that is data rather than prose.</p>
+
+<h2>Fields</h2>
+<div class="wrap"><table>
+	<tr><th><code>businessType</code></th><th>Stores</th><th>Notes</th></tr>
+	<tr><td>Text / LongText / RichText</td><td>Strings</td><td>RichText for editor-authored HTML</td></tr>
+	<tr><td>Integer / LongInteger / Decimal / PrecisionDecimal</td><td>Numbers</td><td>Use PrecisionDecimal for money</td></tr>
+	<tr><td>Boolean</td><td>true/false</td><td></td></tr>
+	<tr><td>Date / DateTime</td><td>Dates</td><td>Sortable and filterable</td></tr>
+	<tr><td>Picklist</td><td>A value from a <a href="#picklists">list type definition</a></td><td>Reference by <code>listTypeDefinitionExternalReferenceCode</code></td></tr>
+	<tr><td>MultiselectPicklist</td><td>Several picklist values</td><td></td></tr>
+	<tr><td>Relationship</td><td>A foreign key to another object</td><td>Created by defining a <a href="#relationships">relationship</a>, not by hand</td></tr>
+	<tr><td>Attachment / MultiselectAttachment</td><td><a href="documents-media.html">Document</a> references</td><td></td></tr>
+	<tr><td>Formula</td><td>Computed from other fields</td><td>Evaluated on read</td></tr>
+	<tr><td id="aggregation">Aggregation</td><td>COUNT/SUM/AVG/MIN/MAX over a relationship</td><td>Computed server-side &mdash; see the trap section, this one solves a real problem</td></tr>
+	<tr><td>Encrypted</td><td>Encrypted-at-rest string</td><td></td></tr>
+</table></div>
+
+<div class="callout trap">
+	<b>Reserved field names roll back the entire site</b>
+	<p><code>status</code>, <code>id</code>, <code>creator</code>, <code>keywords</code>, <code>userId</code> and friends are rejected. <code>name</code>, <code>email</code>, <code>location</code>, <code>company</code> are fine. In a <a href="site-initializers.html">site initializer</a>, a collision throws <code>ObjectFieldNameException$MustNotBeReserved</code>, which <b>aborts initialization and rolls back the whole site transaction</b> &mdash; no site, no objects, no picklists. The symptom reads as "the CET never deployed".</p>
+</div>
+
+<h3>State fields</h3>
+<p>Marking a picklist field <code>"state": true</code> turns it into a lifecycle field with a state flow. It then <b>requires</b> a default:</p>
+<pre><code>{
+	"businessType": "Picklist",
+	"label": { "en_US": "Status" },
+	"listTypeDefinitionExternalReferenceCode": "POLICY_STATUS",
+	"name": "policyStatus",
+	"objectFieldSettings": [
+		{ "name": "defaultValue", "value": "draft" },
+		{ "name": "defaultValueType", "value": "inputAsValue" }
+	],
+	"required": true,
+	"state": true
+}</code></pre>
+<div class="callout trap">
+	<b>Omitting the default is another silent rollback</b>
+	<p>Without <code>defaultValue</code> + <code>defaultValueType</code> you get <code>ObjectFieldSettingValueException.MissingRequiredValues</code> &mdash; same total rollback as a reserved name. And <code>defaultValue</code> must be an existing picklist <b>entry key</b>; a typo there rolls back too.</p>
+</div>
+
+<h2 id="picklists">Picklists (list type definitions)</h2>
+<p>A reusable set of key/label options. Define once, reference from any object field.</p>
+<pre><code>{
+	"externalReferenceCode": "POLICY_STATUS",
+	"listTypeEntries": [
+		{ "externalReferenceCode": "POLICY_STATUS_DRAFT", "key": "draft", "name": "Draft" },
+		{ "externalReferenceCode": "POLICY_STATUS_ACTIVE", "key": "active", "name": "Active" }
+	],
+	"name": "Policy Status"
+}</code></pre>
+<div class="callout trap">
+	<b>Guest cannot read a picklist over REST</b>
+	<p><code>GET /o/headless-admin-list-type/…/list-type-entries</code> returns <b>403</b> for anonymous users, and a company-scope VIEW grant does <em>not</em> lift it. A public <a href="forms.html">form</a> that populates a <code>&lt;select&gt;</code> by fetching the picklist renders it empty; the visitor submits blank and the entry saves looking successful. Ship the options in the fragment markup.</p>
+</div>
+
+<h2 id="relationships">Relationships</h2>
+<div class="wrap"><table>
+	<tr><th>Type</th><th>Meaning</th></tr>
+	<tr><td><code>oneToMany</code></td><td>One parent, many children (Event &rarr; Registrations)</td></tr>
+	<tr><td><code>manyToMany</code></td><td>A join table both ways (Employee &harr; Project)</td></tr>
+</table></div>
+<pre><code>{
+	"deletionType": "cascade",
+	"externalReferenceCode": "EVENT_REGISTRATIONS",
+	"label": { "en_US": "Registrations" },
+	"name": "eventRegistrations",
+	"objectDefinitionId1": "[$OBJECT_DEFINITION_ID:Event$]",
+	"objectDefinitionId2": "[$OBJECT_DEFINITION_ID:Registration$]",
+	"objectDefinitionName2": "Registration",
+	"type": "oneToMany"
+}</code></pre>
+<p><code>deletionType</code> is <code>cascade</code>, <code>disassociate</code>, or <code>prevent</code>.</p>
+<div class="callout trap">
+	<b>The foreign key sits on the child but is named for the parent</b>
+	<p>The relationship above creates <code>r_eventRegistrations_c_eventId</code> on <b>Registration</b> &mdash; not <code>…_c_registrationId</code>. Set that key when creating a child over REST. Get it wrong and the unknown key is <b>ignored</b>: the child is created with the FK left at <code>0</code>, and the POST still returns <b>200</b>. There is an ERC twin, <code>r_eventRegistrations_c_eventERC</code>, which is what OData relationship filters need.</p>
+</div>
+
+<h2>Validation and logic</h2>
+<div class="wrap"><table>
+	<tr><th>Mechanism</th><th>Runs</th><th>Use for</th></tr>
+	<tr><td>Required / unique field settings</td><td>On save</td><td>Basic integrity</td></tr>
+	<tr><td>Validation rule (expression)</td><td>Before save</td><td><code>endDate &gt; startDate</code>, format checks</td></tr>
+	<tr><td><a href="client-extensions.html#objectvalidationrule">Validation rule CET</a></td><td>Before save, over HTTP</td><td>Rules needing external data</td></tr>
+	<tr><td><a href="workflow.html#actions">Object action</a></td><td>onAfterAdd / Update / Delete / standalone</td><td>Notify, create related records, call a webhook</td></tr>
+	<tr><td><a href="workflow.html">Kaleo workflow</a></td><td>On submit</td><td>Multi-step human approval</td></tr>
+</table></div>
+
+<h2>Scope</h2>
+<div class="wrap"><table>
+	<tr><th><code>scope</code></th><th>Behaviour</th><th>Use when</th></tr>
+	<tr><td><code>company</code></td><td>One shared dataset across all sites. <b>Survives site deletion.</b></td><td>Default. Reference data, HR records, anything global.</td></tr>
+	<tr><td><code>site</code></td><td>Per-site data; deleted with the site</td><td>Genuinely site-local content</td></tr>
+</table></div>
+<div class="callout good">
+	<b>Why this matters for your workflow</b>
+	<p>Company-scoped objects and their entries survive the delete-and-redeploy cycle that <a href="site-initializers.html#reprovision">page and fragment changes require</a>. So you can iterate on pages all day without losing runtime data.</p>
+</div>
+
+<h2>The REST surface</h2>
+<div class="wrap"><table>
+	<tr><th>Purpose</th><th>Endpoint</th><th>OAuth scope</th></tr>
+	<tr><td>Define objects, fields, relationships, actions</td><td><code>/o/object-admin/v1.0/object-definitions</code></td><td><code>Liferay.Object.Admin.REST.everything</code></td></tr>
+	<tr><td>Read/write entries</td><td><code>/o/c/&lt;pluralLabel&gt;</code></td><td><code>Liferay.Headless.Object.everything</code></td></tr>
+</table></div>
+<pre><code>curl --silent --user "test@liferay.com:test" \
+	--url "http://localhost:8080/o/c/policies?filter=policyStatus%20eq%20'active'&amp;sort=title:asc&amp;pageSize=20"</code></pre>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="forms.html">Forms &mdash; how visitors create entries</a></li>
+	<li><a href="collections.html">Collections &mdash; how entries get listed</a></li>
+	<li><a href="templates.html#display">Display pages &mdash; a URL per entry</a></li>
+	<li><a href="workflow.html">Workflow &amp; actions &mdash; lifecycle logic</a></li>
+	<li><a href="permissions.html">Permissions &mdash; who sees which entries</a></li>
+	<li><a href="client-extensions.html#microservice">Microservice CETs &mdash; custom logic and storage</a></li>
+	<li><a href="headless-apis.html">Headless APIs &mdash; the generated endpoints</a></li>
+	<li><a href="content-structures.html">Content Structures &mdash; the editorial alternative</a></li>
+</ul>
+
+<h2>Traps</h2>
+<div class="callout trap" id="guest-count">
+	<b>Never count object entries in the browser on a public page</b>
+	<p>A public form's object is typically write-only for Guest: <code>ADD_OBJECT_ENTRY</code> granted, <code>VIEW</code> deliberately not (company-scope VIEW would publish every submitter's name and email). So <code>GET /o/c/&lt;plural&gt;</code> returns <code>200</code> with <code>totalCount: 0</code> for the visitor, and "500 of 500 seats" renders as "0 of 500".</p>
+	<p>Fix it with an <b>Aggregation field</b> (<code>businessType: Aggregation</code>, <code>function: COUNT</code>) on the parent object. Aggregations are computed server-side and <b>ignore entry-level permissions</b>, so Guest gets the right number without being able to read a single submission. It serializes as a <b>string</b> &mdash; parse before arithmetic.</p>
+</div>
+<div class="callout good">
+	<b>The submission POST does return the entry</b>
+	<p>Write-only is not write-blind. A Guest holding <code>ADD_OBJECT_ENTRY</code> and no VIEW still gets <b>200</b> with the complete created entry &mdash; id, fields, resolved picklists, the FK and its ERC twin, and workflow status. So a form can confirm back what was recorded. Do not code defensively around a body that is in fact there.</p>
+</div>
+<div class="callout warn">
+	<b>Objects are not reproducible from a site initializer alone</b>
+	<p>Definitions are company-scoped, so they persist across reprovisions &mdash; but a <em>fresh bundle</em> or a different environment starts without them. Either keep them in <code>object-definitions/</code> or script them over <code>object-admin</code>; be explicit about which half of the data layer your tree actually rebuilds.</p>
+</div>
+<div class="callout warn">
+	<b>Publish before you reference</b>
+	<p><code>[$OBJECT_DEFINITION_ID:Name$]</code> and <code>[$OBJECT_DEFINITION_CLASS_NAME:Name$]</code> tokens resolve for every <b>published</b> object in the company &mdash; including ones created live outside the tree. A draft definition registers no token, and the file referencing it fails to parse.</p>
+</div>

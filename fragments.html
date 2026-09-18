@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fragments · Liferay Component Guide</title>
+<meta name="description" content="The HTML/CSS/JS building blocks editors drag onto pages. The single most useful thing to learn well — most "we need a custom component" requests are a fragment.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+	<strong><a href="index.html">Liferay Component Guide</a></strong>
+	<span>DXP 2026.Q2 &middot; what each piece is, and when to reach for it</span>
+</header>
+<div class="shell">
+	<nav class="sidebar" aria-label="Components">
+			<h4>Start here</h4>
+			<ul>
+				<li><a href="index.html">Overview & map</a></li>
+				<li><a href="decision-guide.html">What should I use?</a></li>
+			</ul>
+			<h4>Content</h4>
+			<ul>
+				<li><a href="web-content.html">Web Content (articles)</a></li>
+				<li><a href="content-structures.html">Content Structures</a></li>
+				<li><a href="web-content-templates.html">Web Content Templates</a></li>
+				<li><a href="documents-media.html">Documents & Media</a></li>
+				<li><a href="taxonomy.html">Categories, Tags & Assets</a></li>
+			</ul>
+			<h4>Pages & layout</h4>
+			<ul>
+				<li><a href="pages.html">Pages & page types</a></li>
+				<li><a aria-current="page" href="fragments.html">Fragments</a></li>
+				<li><a href="collections.html">Collections</a></li>
+				<li><a href="templates.html">All template types</a></li>
+				<li><a href="theme-design.html">Themes & style books</a></li>
+				<li><a href="personalization.html">Segments & experiences</a></li>
+			</ul>
+			<h4>Data & logic</h4>
+			<ul>
+				<li><a href="objects.html">Objects</a></li>
+				<li><a href="forms.html">Forms</a></li>
+				<li><a href="workflow.html">Workflow & notifications</a></li>
+				<li><a href="permissions.html">Roles & permissions</a></li>
+			</ul>
+			<h4>Extend & integrate</h4>
+			<ul>
+				<li><a href="client-extensions.html">Client extensions</a></li>
+				<li><a href="widgets-modules.html">Widgets & OSGi modules</a></li>
+				<li><a href="headless-apis.html">Headless APIs</a></li>
+				<li><a href="site-initializers.html">Site initializers</a></li>
+			</ul>
+	</nav>
+	<main id="main">
+		<h1>Fragments</h1>
+		<p class="lede">The HTML/CSS/JS building blocks editors drag onto pages. The single most useful thing to learn well — most "we need a custom component" requests are a fragment.</p>
+
+<h2>In one sentence</h2>
+<p>A <b>fragment</b> is a small, self-contained piece of a page &mdash; a hero, a card row, a CTA &mdash; written in plain HTML/CSS/JS, with declared <b>configuration options</b> and <b>editable elements</b>, that a non-developer can drop onto a <a href="pages.html">content page</a> and adjust without touching code.</p>
+
+<h2>Anatomy</h2>
+<div class="ascii">fragments/group/&lt;collection-key&gt;/
+├── collection.json                 {"name": "Badael Home", "description": "…"}
+└── fragments/
+    └── home-hero/                  ← the directory name IS the fragment key
+        ├── fragment.json           name, type, css/js/html file pointers
+        ├── index.html              the markup
+        ├── index.css               scoped styles
+        ├── index.js                behaviour (optional)
+        ├── configuration.json      the options editors see (optional)
+        └── thumbnail.png           sidebar preview (optional)</div>
+
+<h3>The four moving parts</h3>
+<div class="wrap"><table>
+	<tr><th>Part</th><th>Who controls it</th><th>Purpose</th></tr>
+	<tr><td><code>index.html</code></td><td>You</td><td>Markup, with editable markers and <code>${configuration.*}</code> interpolation</td></tr>
+	<tr><td><code>configuration.json</code></td><td>You define, editor chooses</td><td>Per-placement options: heading level, alignment, colour, item count</td></tr>
+	<tr><td>Editable elements</td><td>Editor types, or maps</td><td>The text/image an editor edits in place, or maps to a content field</td></tr>
+	<tr><td><code>index.css</code> / <code>index.js</code></td><td>You</td><td>Styles and behaviour, namespaced per placement</td></tr>
+</table></div>
+
+<h2>Editable elements &mdash; where content actually enters</h2>
+<p>Mark any element editable and the page editor lets someone change it in place:</p>
+<pre><code>&lt;h2 data-lfr-editable-id="hero-title" data-lfr-editable-type="text"&gt;
+	Welcome to Badael
+&lt;/h2&gt;
+
+&lt;img data-lfr-editable-id="hero-image" data-lfr-editable-type="image" src="placeholder.png" alt=""&gt;
+
+&lt;a data-lfr-editable-id="hero-cta" data-lfr-editable-type="link" href="#"&gt;Read more&lt;/a&gt;</code></pre>
+<div class="wrap"><table>
+	<tr><th><code>data-lfr-editable-type</code></th><th>Editor gets</th></tr>
+	<tr><td><code>text</code></td><td>Plain text, inline</td></tr>
+	<tr><td><code>rich-text</code></td><td>A WYSIWYG toolbar</td></tr>
+	<tr><td><code>image</code></td><td>Media picker (<a href="documents-media.html">Documents &amp; Media</a>)</td></tr>
+	<tr><td><code>link</code></td><td>URL, page picker, target</td></tr>
+	<tr><td><code>html</code></td><td>Raw markup</td></tr>
+	<tr><td><code>backgroundImage</code></td><td>Background image picker on a container</td></tr>
+</table></div>
+
+<h3 id="mapping">Mapping &mdash; the part people miss</h3>
+<p>An editable element does not have to hold typed text. It can be <b>mapped</b> to a field of a content item, which is how one fragment renders a thousand different records:</p>
+<ul>
+	<li>Map to a specific <a href="web-content.html">Web Content</a> field &rarr; "always show the CEO letter's title here".</li>
+	<li>Map to <b>the current item</b> on a <a href="templates.html#display">display page template</a> &rarr; the fragment renders whichever record the URL points at.</li>
+	<li>Map to <b>the collection item</b> inside a <a href="collections.html">Collection Display</a> &rarr; one card fragment, N rows.</li>
+</ul>
+<p>Mapped fragments are what turn a static design into a CMS. A fragment with only typed-in text is a nicely styled dead end.</p>
+
+<h2>Configuration options</h2>
+<pre><code>{
+	"fieldSets": [
+		{
+			"label": "Layout",
+			"fields": [
+				{
+					"name": "headingLevel",
+					"label": "Heading level",
+					"type": "select",
+					"defaultValue": "h2",
+					"typeOptions": { "validValues": [ {"value": "h1"}, {"value": "h2"}, {"value": "h3"} ] }
+				},
+				{ "name": "showImage", "label": "Show image", "type": "checkbox", "defaultValue": true }
+			]
+		}
+	]
+}</code></pre>
+<p>Values land in the markup as FreeMarker variables:</p>
+<pre><code>&lt;${configuration.headingLevel} class="component-heading" data-lfr-editable-id="element-text" data-lfr-editable-type="text"&gt;
+	Heading Example
+&lt;/${configuration.headingLevel}&gt;</code></pre>
+<div class="wrap"><table>
+	<tr><th>Field type</th><th>Use for</th></tr>
+	<tr><td><code>text</code>, <code>select</code>, <code>checkbox</code>, <code>colorPicker</code></td><td>Ordinary options</td></tr>
+	<tr><td><code>itemSelector</code></td><td>Let the editor pick a content item</td></tr>
+	<tr><td><code>collectionSelector</code></td><td>Let the editor pick a <a href="collections.html">collection</a>; iterate <code>collectionObjectList</code></td></tr>
+</table></div>
+<pre><code>[#list collectionObjectList as item]
+	&lt;li&gt;${item.title}&lt;/li&gt;
+[/#list]</code></pre>
+
+<h2 id="types">Fragment types</h2>
+<div class="wrap"><table>
+	<tr><th>Type</th><th>What it is</th><th>Use for</th></tr>
+	<tr><td><b>Component</b></td><td>The default: a normal building block</td><td>Heroes, cards, CTAs, tables, anything</td></tr>
+	<tr><td><b>Section</b></td><td>A full-width block, usually containing a drop zone</td><td>Page-level bands with nested content</td></tr>
+	<tr><td><b>Input</b></td><td>Binds to an <a href="objects.html">Object</a> field inside a <a href="forms.html">Form Container</a></td><td>Custom form controls &mdash; see <a href="forms.html">Forms</a></td></tr>
+	<tr><td><b>React fragment</b></td><td>Fragment whose JS mounts a React tree</td><td>Interactive widgets that still belong to the page editor</td></tr>
+</table></div>
+<div class="callout warn">
+	<b>Section fragments break the fragment listing API</b>
+	<p>One fragment declaring <code>"type": "section"</code> makes the whole set's <code>headless-admin-fragment</code> listing return <b>400</b>. Verified on 2026.Q2. Harmless for rendering, annoying for tooling.</p>
+</div>
+
+<h2>Fragment vs the alternatives</h2>
+<div class="wrap"><table>
+	<tr><th>Need</th><th>Use</th><th>Why</th></tr>
+	<tr><td>Editors place and configure it on pages</td><td><b>Fragment</b></td><td>Only fragments live in the page editor sidebar</td></tr>
+	<tr><td>Same markup for every item of a content type, everywhere</td><td><a href="web-content-templates.html">Web Content Template</a></td><td>Belongs to the type, not the page</td></tr>
+	<tr><td>A real application: state, routing, heavy libraries</td><td><a href="client-extensions.html#customelement">Custom Element CET</a></td><td>Own build pipeline, own lifecycle</td></tr>
+	<tr><td>Behaviour on every page whether or not a fragment is placed</td><td><a href="client-extensions.html#globaljs">globalJS CET</a></td><td>Fragments only run where placed</td></tr>
+	<tr><td>Server-side logic with credentials</td><td><a href="client-extensions.html#microservice">Microservice CET</a></td><td>Fragment JS runs in the visitor's browser as the visitor</td></tr>
+</table></div>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="pages.html">Pages &mdash; where fragments are placed</a></li>
+	<li><a href="collections.html">Collections &mdash; fragments render each item</a></li>
+	<li><a href="templates.html#master">Master pages &mdash; header/footer fragments</a></li>
+	<li><a href="templates.html#display">Display pages &mdash; fragments map to the current item</a></li>
+	<li><a href="web-content.html">Web Content &mdash; what editables map to</a></li>
+	<li><a href="objects.html">Objects &mdash; mapped fields and form inputs</a></li>
+	<li><a href="theme-design.html">Style books &mdash; the tokens fragment CSS should use</a></li>
+	<li><a href="site-initializers.html">Site initializers &mdash; where fragment source lives</a></li>
+</ul>
+
+<h2 id="sets">Fragment sets (aka fragment collections)</h2>
+<p>Fragments live in named sets, which is just how the sidebar groups them. In an initializer tree the set is the directory under <code>fragments/group/</code> with a <code>collection.json</code>. Group by purpose &mdash; <em>Chrome</em>, <em>Home</em>, <em>Cards</em> &mdash; not by page, because fragments get reused across pages.</p>
+
+<h2>Traps</h2>
+<div class="callout trap">
+	<b>Editing a fragment does not update pages that already use it</b>
+	<p>Liferay <b>copies</b> fragment code into each page's fragment instance at placement time. Changing the source &mdash; in the tree or via the <code>headless-admin-fragment</code> API &mdash; updates the library entry and leaves every existing placement untouched. To apply a fragment change you <a href="site-initializers.html#reprovision">reprovision the site</a>. This surprises everyone exactly once, usually for an afternoon.</p>
+</div>
+<div class="callout trap">
+	<b>Wrong keys in a page definition render a blank page</b>
+	<p>In <code>page-definition.json</code> a fragment is referenced by <code>key</code> (its directory name) plus <code>siteKey</code> (<code>[$GROUP_KEY$]</code>). Writing <code>collectionExternalReferenceCode</code>/<code>fragmentEntryKey</code> instead is <em>silently dropped</em> &mdash; the page provisions successfully and renders empty. Built-in fragments use a combined key with no siteKey, e.g. <code>BASIC_COMPONENT-paragraph</code>.</p>
+</div>
+<div class="callout warn">
+	<b>Scope your CSS</b>
+	<p>Fragment CSS is injected globally once the fragment is on a page. Prefix selectors (<code>#wrapper .badael-hero …</code>) or use <code>${fragmentEntryLinkNamespace}</code> for per-placement scoping, or your hero will restyle somebody else's card.</p>
+</div>
+<div class="callout warn">
+	<b>Fragment JS runs as the visitor</b>
+	<p>Any <code>fetch</code> you write executes with the visitor's session. What returns data for you may return <code>403</code> or an empty list for Guest. See <a href="permissions.html#guest">Guest access</a> before building anything data-driven on a public page.</p>
+</div>
+		<footer class="pagefoot">
+			Part of the <a href="index.html">Liferay Component Guide</a>.
+			Not sure which component fits? Start at <a href="decision-guide.html">What should I use?</a>
+		</footer>
+	</main>
+</div>
+</body>
+</html>

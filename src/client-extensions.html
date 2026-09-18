@@ -1,0 +1,209 @@
+<!--title: Client Extensions-->
+<!--subtitle: How you add your own code to Liferay without putting it inside Liferay. Every CET type, what it hooks into, and a concrete use case for each.-->
+
+<h2>In one sentence</h2>
+<p>A <b>Client Extension (CET)</b> is a unit of customisation declared in a <code>client-extension.yaml</code> and deployed as a zip or a container. It either <b>injects assets into the browser</b>, <b>registers configuration</b>, <b>imports data</b>, or <b>exposes an HTTP endpoint Liferay calls</b> &mdash; but it never runs inside Liferay's JVM.</p>
+<div class="callout good">
+	<b>Why this matters</b>
+	<p>Because CETs live outside the platform, they survive upgrades, work on SaaS, deploy independently, and can be written in any language. That is the whole reason to prefer them over <a href="widgets-modules.html">OSGi modules</a>.</p>
+</div>
+
+<h2>The four classifications</h2>
+<div class="ascii">  FRONTEND        assets injected into the browser        (CSS, JS, custom elements, themes)
+  CONFIGURATION   OAuth apps and typed settings           (no code, no endpoint)
+  MICROSERVICE    an HTTP endpoint Liferay calls INBOUND  (object actions, validators, workflow)
+  BATCH           bulk data import / whole-site setup     (batch, siteInitializer)</div>
+
+<h2 id="grouping">Which types may share one project</h2>
+<p>This is enforced by the workspace Gradle plugin, and the failure appears late &mdash; after the assemble tasks have already printed success.</p>
+<div class="wrap"><table>
+	<tr><th>Allowed grouping</th><th>Covers</th></tr>
+	<tr><td><code>configuration</code></td><td>OAuth apps and <code>instanceSettings</code> alone</td></tr>
+	<tr><td><code>configuration</code> + <code>batch</code></td><td>A <code>batch</code> or <code>siteInitializer</code> with its OAuth companion</td></tr>
+	<tr><td><code>configuration</code> + <code>frontend</code></td><td>Theme, CSS, JS, custom elements, with OAuth if needed</td></tr>
+	<tr><td><code>configuration</code> + <code>microservice</code></td><td>Handlers with OAuth</td></tr>
+</table></div>
+<div class="callout trap">
+	<b>batch, frontend and microservice can never be combined</b>
+	<p>Add a <code>themeCSS</code> to your <code>siteInitializer</code> project and the build fails at <code>createClientExtensionConfig</code>:</p>
+	<pre><code>The combination of client extensions in [configuration, batch, frontend] cannot be
+grouped in a single project.</code></pre>
+	<p><b>A complete site is several sibling projects, not one.</b> Expect at least: the initializer + its OAuth, a frontend project for theme/CSS, and a microservice project per handler group. A <code>batch</code>/<code>siteInitializer</code> project must also contain <b>exactly one</b> <code>oAuthApplicationHeadlessServer</code> and <b>at most one</b> batch/initializer entry.</p>
+</div>
+
+<h2>Frontend types</h2>
+<div class="wrap"><table>
+	<tr><th>Type</th><th>Injects</th><th>Required fields</th></tr>
+	<tr><td id="customelement"><code>customElement</code></td><td>A web-component widget (React/Vue/vanilla) placeable as a widget</td><td><code>htmlElementName</code>, <code>urls</code></td></tr>
+	<tr><td id="globalcss"><code>globalCSS</code></td><td>A CSS file on every page</td><td><code>url</code></td></tr>
+	<tr><td id="globaljs"><code>globalJS</code></td><td>A JS file on every page</td><td><code>scriptElementAttributes</code>, <code>url</code></td></tr>
+	<tr><td id="iframe"><code>iframe</code></td><td>A portlet that frames an external URL</td><td><code>portletCategoryName</code>, <code>url</code></td></tr>
+	<tr><td><code>themeCSS</code></td><td>Clay variable overrides; replaces the legacy theme WAR</td><td><code>mainURL</code></td></tr>
+	<tr><td><code>themeFavicon</code> / <code>themeSpritemap</code></td><td>Favicon / Clay icon spritemap</td><td><code>url</code></td></tr>
+	<tr><td><code>staticContent</code></td><td>Static files on the portal CDN path</td><td>&mdash;</td></tr>
+	<tr><td><code>jsImportMapsEntry</code></td><td>Registers an ES module in the browser import map</td><td><code>bareSpecifier</code>, <code>url</code></td></tr>
+	<tr><td><code>editorConfigContributor</code></td><td>CKEditor toolbar buttons / config</td><td><code>editorConfigKeys</code>, <code>url</code></td></tr>
+	<tr><td id="fdsfilter"><code>fdsCellRenderer</code> / <code>fdsFilter</code></td><td>Custom cell renderer / filter for Frontend Data Set tables</td><td><code>name</code>, <code>url</code></td></tr>
+	<tr><td><code>commerceCheckoutStep</code></td><td>A step in the Commerce checkout flow</td><td><code>label</code>, <code>name</code>, <code>order</code>, <code>url</code></td></tr>
+</table></div>
+
+<h3>Use cases</h3>
+<div class="wrap"><table>
+	<tr><th>"We need&hellip;"</th><th>Type</th><th>Why</th></tr>
+	<tr><td>An org-chart explorer with search and zoom</td><td><code>customElement</code></td><td>Real app state; a <a href="fragments.html">fragment</a> would fight you</td></tr>
+	<tr><td>A cookie banner on every page including login</td><td><code>globalJS</code></td><td>Fragments only run where placed</td></tr>
+	<tr><td>Brand colours and fonts across the instance</td><td><code>themeCSS</code></td><td>Clay-level overrides; pair with a <a href="theme-design.html#stylebook">style book</a></td></tr>
+	<tr><td>One CSS tweak to Liferay's own admin screens</td><td><code>globalCSS</code></td><td>Applies instance-wide, including the Control Panel</td></tr>
+	<tr><td>Embed an existing Power BI dashboard</td><td><code>iframe</code></td><td>No integration work, editors can place it</td></tr>
+	<tr><td>A "priority" column rendered as a coloured pill in a data table</td><td><code>fdsCellRenderer</code></td><td>The only supported way to restyle FDS cells</td></tr>
+	<tr><td>Company icon set replacing Clay's</td><td><code>themeSpritemap</code></td><td>Swaps the SVG sprite globally</td></tr>
+</table></div>
+<pre><code># customElement — a React widget
+badael-org-chart:
+    cssURLs:
+        - css/main.css
+    htmlElementName: badael-org-chart
+    instanceable: false
+    name: Badael Org Chart
+    portletCategoryName: category.client-extensions
+    type: customElement
+    urls:
+        - js/main.js
+    useESM: true</code></pre>
+
+<h2 id="microservice">Microservice types</h2>
+<p>These expose an HTTP endpoint that <b>Liferay calls inbound</b>. Each needs an <code>oAuthApplicationUserAgent</code> companion that carries <code>.serviceAddress</code> and <code>.serviceScheme</code>; each CET entry carries its own <code>resourcePath</code>.</p>
+<div class="wrap"><table>
+	<tr><th>Type</th><th>Called when</th><th>Scope needed</th></tr>
+	<tr><td id="objectaction"><code>objectAction</code></td><td>An <a href="objects.html">object</a> entry is added/updated/deleted, or an action is invoked</td><td><code>Liferay.Headless.Object.everything</code></td></tr>
+	<tr><td id="objectvalidationrule"><code>objectValidationRule</code></td><td><b>Before</b> an entry saves; you return pass/fail and block the save</td><td><code>Liferay.Headless.Object.everything</code></td></tr>
+	<tr><td id="objectentrymanager"><code>objectEntryManager</code></td><td>Every CRUD call on an <code>ext-Service</code> object &mdash; you <em>are</em> the storage</td><td><code>Liferay.Headless.Object.everything</code></td></tr>
+	<tr><td id="workflowaction"><code>workflowAction</code></td><td>A Kaleo workflow reaches an action node</td><td><code>Liferay.Headless.Admin.Workflow.everything</code></td></tr>
+	<tr><td id="notificationtype"><code>notificationType</code></td><td>A notification of your custom channel fires</td><td><code>Liferay.Headless.Object.everything</code></td></tr>
+	<tr><td><code>captcha</code></td><td>A form needs CAPTCHA verification</td><td>none</td></tr>
+	<tr><td><code>commercePaymentIntegration</code> / <code>commerceShippingEngine</code> / <code>commerceTaxEngine</code></td><td>Checkout needs a gateway, rate, or tax figure</td><td>Commerce scopes</td></tr>
+</table></div>
+
+<h3>Use cases</h3>
+<div class="wrap"><table>
+	<tr><th>"We need&hellip;"</th><th>Type</th></tr>
+	<tr><td>Post every approved leave request to the HR system</td><td><code>objectAction</code> on <code>onAfterUpdate</code> with a status condition</td></tr>
+	<tr><td>Reject a purchase order whose total exceeds the requester's limit &mdash; a limit stored elsewhere</td><td><code>objectValidationRule</code> (expression rules cannot call out)</td></tr>
+	<tr><td>Show SAP equipment records in Liferay UI without copying them</td><td><code>objectEntryManager</code> &mdash; the object becomes a live view of SAP</td></tr>
+	<tr><td>Auto-approve requests under 1000 AED</td><td><code>workflowAction</code> that PATCHes the transition URL with <code>{"transitionName": "approve"}</code></td></tr>
+	<tr><td>Send approvals to Microsoft Teams instead of email</td><td><code>notificationType</code></td></tr>
+</table></div>
+<pre><code>badael-handlers-oauth:
+    .serviceAddress: localhost:58081
+    .serviceScheme: http
+    name: Badael Handlers OAuth
+    scopes:
+        - Liferay.Headless.Object.everything
+    type: oAuthApplicationUserAgent
+
+badael-on-leave-approved:
+    name: On Leave Approved
+    oAuth2ApplicationExternalReferenceCode: badael-handlers-oauth
+    resourcePath: /object/action/leave-approved
+    type: objectAction</code></pre>
+<p>An <code>objectValidationRule</code> can also be narrowed to specific objects:</p>
+<pre><code>    allowedObjectDefinitionNames:
+        -   C_Employee</code></pre>
+<div class="callout note">
+	<b>The token flows both ways</b>
+	<p>Liferay calls your endpoint with a Bearer token, and that token is what your service uses to call <em>back</em> into Liferay's Headless APIs &mdash; as the acting user, with their permissions. That is why the companion is a <code>UserAgent</code> app and not a server app.</p>
+</div>
+
+<h2>Configuration types</h2>
+<div class="wrap"><table>
+	<tr><th>Type</th><th>Purpose</th></tr>
+	<tr><td><code>oAuthApplicationHeadlessServer</code></td><td>Service-account OAuth app &mdash; the CET calls <em>into</em> Liferay. Used by <code>batch</code> and <code>siteInitializer</code>.</td></tr>
+	<tr><td><code>oAuthApplicationUserAgent</code></td><td>User-delegated OAuth app &mdash; Liferay calls <em>out</em> to the CET and passes a token. Used by microservice CETs.</td></tr>
+	<tr><td><code>instanceSettings</code></td><td>Typed OSGi configuration deployed as a <code>.config</code> file, editable in Instance Settings</td></tr>
+</table></div>
+<p>The direction of the call is the whole distinction, and it is the single most common cause of a CET that deploys cleanly and authenticates against nothing.</p>
+
+<h2>Batch types</h2>
+<div class="wrap"><table>
+	<tr><th>Type</th><th>Purpose</th></tr>
+	<tr><td><code>batch</code></td><td>Bulk data import through the Batch Engine (JSON files with a <code>configuration.className</code> envelope)</td></tr>
+	<tr><td><code>siteInitializer</code></td><td>A whole site from source: pages, fragments, objects, roles, content &mdash; see <a href="site-initializers.html">Site initializers</a></td></tr>
+</table></div>
+<div class="callout trap">
+	<b>There is no <code>batch/</code> directory inside a site initializer</b>
+	<p><code>*.batch-engine-data.json</code> files placed in an initializer tree are packaged into the zip and <b>silently ignored</b>. The build succeeds, the site provisions, no data appears. That envelope belongs to the separate <code>batch</code> CET type.</p>
+</div>
+
+<h2>Minimum viable examples</h2>
+<pre><code># globalCSS
+badael-global-css:
+    name: Badael Global CSS
+    scope: company
+    type: globalCSS
+    url: global.*.css</code></pre>
+<pre><code># themeCSS
+badael-home-theme-css:
+    clayRTLURL: css/clay_rtl.css
+    clayURL: css/clay.css
+    mainRTLURL: css/main_rtl.css
+    mainURL: css/main.css
+    name: Badael Home Theme CSS
+    type: themeCSS</code></pre>
+<pre><code># siteInitializer + its OAuth companion
+badael-site-init:
+    name: Badael Site Initializer
+    oAuthApplicationHeadlessServer: badael-site-oauth
+    siteExternalReferenceCode: badael
+    siteName: Badael Site
+    type: siteInitializer
+
+badael-site-oauth:
+    .serviceAddress: localhost:8080
+    .serviceScheme: http
+    name: Badael Site OAuth
+    scopes:
+        - Liferay.Headless.Admin.Site.everything
+        - Liferay.Headless.Admin.Content.everything
+        - Liferay.Object.Admin.REST.everything
+        - Liferay.Headless.Object.everything
+        - Liferay.Headless.Admin.User.everything
+    type: oAuthApplicationHeadlessServer</code></pre>
+
+<h2>Building and deploying</h2>
+<pre><code>cd client-extensions/&lt;name&gt;
+blade gw deploy</code></pre>
+<p>The <code>assemble</code> block says what gets packaged:</p>
+<pre><code>assemble:
+    - from: site-initializer
+      into: site-initializer</code></pre>
+<pre><code>assemble:
+    -   fromTask: bootJar      # a Spring Boot microservice CET</code></pre>
+<div class="callout warn">
+	<b>BUILD SUCCESSFUL is not verification</b>
+	<p>Success means the zip was produced. Confirm the bundle reached <code>STARTED</code> in the log, and for an initializer confirm the <code>Initializing &lt;Site&gt;</code> count actually increased. Gradle's up-to-date check is content-based, so with no source edit a redeploy rewrites nothing at all.</p>
+</div>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="objects.html">Objects &mdash; what most microservice CETs hook into</a></li>
+	<li><a href="workflow.html">Workflow &amp; notifications &mdash; the other hook points</a></li>
+	<li><a href="site-initializers.html">Site initializers &mdash; a CET that builds a site</a></li>
+	<li><a href="theme-design.html">Themes &mdash; themeCSS and style books</a></li>
+	<li><a href="fragments.html">Fragments &mdash; the lighter-weight alternative</a></li>
+	<li><a href="widgets-modules.html">OSGi modules &mdash; when a CET is not enough</a></li>
+	<li><a href="headless-apis.html">Headless APIs &mdash; what CETs call</a></li>
+</ul>
+
+<h2>Traps</h2>
+<div class="callout trap">
+	<b>Wrong OAuth type = silent auth failure</b>
+	<p><code>oAuthApplicationHeadlessServer</code> for CETs that call into Liferay; <code>oAuthApplicationUserAgent</code> for CETs Liferay calls. Getting it backwards deploys fine and fails at the first request.</p>
+</div>
+<div class="callout warn">
+	<b>401 vs 403</b>
+	<p><b>403</b> means the token is valid but its scopes do not cover the endpoint &mdash; add the scope and redeploy. <b>401</b> means the token itself is wrong &mdash; check the OAuth registration, not the scopes.</p>
+</div>
+<div class="callout warn">
+	<b>Unknown scope strings fail the deploy</b>
+	<p>Liferay validates the <code>scopes</code> list on deploy. Also note the object split: <code>Liferay.Object.Admin.REST.everything</code> is for <em>definitions</em> (<code>/o/object-admin/…</code>); <code>Liferay.Headless.Object.everything</code> is for <em>entries</em> (<code>/o/c/&lt;plural&gt;</code>). Most handlers only need the second.</p>
+</div>

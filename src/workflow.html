@@ -1,0 +1,119 @@
+<!--title: Workflow & notifications-->
+<!--subtitle: Three different mechanisms answer "do something when X happens": object actions, Kaleo workflows, and notification templates. They solve different problems and are often combined.-->
+
+<h2>Pick the right mechanism</h2>
+<div class="wrap"><table>
+	<tr><th>You want&hellip;</th><th>Use</th><th>Human in the loop?</th></tr>
+	<tr><td>Run logic the moment a record changes</td><td><a href="#actions">Object action</a></td><td>No</td></tr>
+	<tr><td>Route a record through review and approval steps</td><td><a href="#kaleo">Kaleo workflow</a></td><td>Yes</td></tr>
+	<tr><td>Send an email / in-app message</td><td><a href="#notifications">Notification template</a> + a notification action</td><td>n/a</td></tr>
+	<tr><td>Block a save when data is invalid</td><td><a href="objects.html">Validation rule</a>, not any of these</td><td>No</td></tr>
+</table></div>
+
+<h2 id="actions">Object actions</h2>
+<p>Logic attached to an <a href="objects.html">Object</a>, fired by a trigger.</p>
+<div class="wrap"><table>
+	<tr><th>Trigger</th><th>Fires</th><th>Typical use</th></tr>
+	<tr><td><code>onAfterAdd</code></td><td>After create, committed</td><td>Welcome notification, audit entry</td></tr>
+	<tr><td><code>onAfterUpdate</code></td><td>After update, committed</td><td>Status-change notification, recalculation</td></tr>
+	<tr><td><code>onAfterDelete</code></td><td>After delete</td><td>Cascade cleanup, audit</td></tr>
+	<tr><td><code>standalone</code></td><td>Only when invoked from the Actions menu or API</td><td>Manual approve, export</td></tr>
+</table></div>
+<p>A <code>conditionExpression</code> limits when it runs; empty means always:</p>
+<pre><code>requestStatus == "approved"
+amount &gt; 1000
+(priority == "high") AND (assigneeId != null)</code></pre>
+
+<h3>Executor types</h3>
+<div class="wrap"><table>
+	<tr><th>Executor</th><th>Does</th><th>Notes</th></tr>
+	<tr><td><code>notification</code></td><td>Sends a notification from a template</td><td>Needs <code>notificationTemplateId</code></td></tr>
+	<tr><td><code>add-object-entry</code></td><td>Creates an entry in another object</td><td><code>objectDefinitionId</code> + <code>predefinedValues</code></td></tr>
+	<tr><td><code>update-object-entry</code></td><td>Updates an entry</td><td>Same shape plus <code>objectEntryId</code></td></tr>
+	<tr><td><code>webhook</code></td><td>POSTs JSON to a URL</td><td>Signed <code>HMAC-SHA256</code>; digest in <code>X-Liferay-Webhook-Signature</code></td></tr>
+	<tr><td><code>groovy</code></td><td>Runs a Groovy script in the JVM</td><td><a href="#groovy">Usually disabled</a> &mdash; read before designing around it</td></tr>
+	<tr><td><code>objectAction</code> (CET)</td><td>Calls your <a href="client-extensions.html#objectaction">microservice</a></td><td>The recommended route for real logic</td></tr>
+</table></div>
+<pre><code>{
+	"active": true,
+	"conditionExpression": "requestStatus == \"approved\"",
+	"label": { "en_US": "Notify HR on approval" },
+	"name": "notifyHrOnApproval",
+	"objectActionExecutorKey": "notification",
+	"objectActionTriggerKey": "onAfterUpdate",
+	"parameters": { "notificationTemplateId": "12345" }
+}</code></pre>
+
+<div class="callout trap" id="groovy">
+	<b>Groovy actions are off by default &mdash; plan without them</b>
+	<p>Beyond being unavailable on SaaS, creating one is gated at runtime by <code>ScriptManagementConfiguration</code>, which is <b>off by default on current DXP</b>. The definition is rejected outright:</p>
+	<pre><code>400 ObjectActionExecutorKeyException
+Groovy script based object actions are not allowed</code></pre>
+	<p>Turning it on is a portal-wide decision to permit arbitrary script execution &mdash; surface it, never enable it quietly. Probe with a throwaway action before designing a solution around Groovy, and prefer a scriptless alternative: an <a href="objects.html#aggregation">Aggregation field</a> replaces a hand-maintained counter outright.</p>
+	<p>If it <em>is</em> enabled: the bindings are the entry's fields as <b>top-level variables</b>, not an <code>objectEntry</code> object. A <code>Registration</code> field is bare <code>attendeeName</code>; a relationship FK is bare <code>r_eventRegistrations_c_eventId</code>. Also bound: <code>creator</code>, <code>currentDate</code>, <code>currentUserId</code>, <code>groupId</code>, <code>id</code>, <code>entryDTO</code>. Guard optional fields with <code>binding.hasVariable("name")</code>.</p>
+</div>
+
+<h2 id="kaleo">Kaleo workflows</h2>
+<p>Kaleo is the approval engine. A workflow definition is XML describing <b>states</b>, <b>tasks</b> (assigned to roles or users), and <b>transitions</b> between them. Attach a definition to a content type &mdash; <a href="web-content.html">Web Content</a>, an <a href="objects.html">Object</a>, Documents &mdash; and new items enter the flow instead of publishing immediately.</p>
+<div class="ascii">  submit ──▶ [ review task ]──approve──▶ [ manager task ]──approve──▶ APPROVED (visible)
+                   │                            │
+                 reject                       reject
+                   ▼                            ▼
+                 PENDING (back to author)    DENIED</div>
+<div class="wrap"><table>
+	<tr><th>Concept</th><th>Meaning</th></tr>
+	<tr><td>State</td><td>A resting point: <code>created</code>, <code>approved</code>, <code>denied</code></td></tr>
+	<tr><td>Task</td><td>Work assigned to a human; appears in their My Workflow Tasks</td></tr>
+	<tr><td>Transition</td><td>The edge between nodes</td></tr>
+	<tr><td>Action</td><td>Script or <a href="client-extensions.html#workflowaction">CET</a> executed at a node</td></tr>
+	<tr><td>Assignment</td><td>Role, user, scripted assignee, or resource creator</td></tr>
+</table></div>
+<p>Entries under workflow carry a <code>status</code>; a <a href="collections.html">collection</a> only shows approved items, which is usually what you want and occasionally the reason your list is empty.</p>
+<p>A <a href="client-extensions.html#workflowaction">workflowAction CET</a> receives the task with a <code>transitionURL</code> and advances it:</p>
+<pre><code>PATCH {transitionURL}   {"transitionName": "approve"}</code></pre>
+
+<h2 id="notifications">Notification templates</h2>
+<p>The body of an email or in-app notification, with token interpolation:</p>
+<pre><code>POST /o/notification/v1.0/notification-templates
+
+Hello [%USER_FIRST_NAME%],
+Your request [%OBJECT_FIELD_requestId%] is now [%OBJECT_FIELD_requestStatus%].</code></pre>
+<div class="wrap"><table>
+	<tr><th>Channel</th><th>How</th></tr>
+	<tr><td>Email</td><td>Built in &mdash; template type Email</td></tr>
+	<tr><td>In-app (the bell)</td><td>Built in &mdash; template type User Notification</td></tr>
+	<tr><td>SMS, push, Teams, Slack</td><td><a href="client-extensions.html#notificationtype">notificationType CET</a></td></tr>
+</table></div>
+<p>Create the template first, then reference its ID from a <code>notification</code> object action. Templates live in an initializer under <code>notification-templates/</code>, and the action that uses one under <code>object-actions/</code>.</p>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="objects.html">Objects &mdash; what actions attach to</a></li>
+	<li><a href="forms.html">Forms &mdash; what triggers most flows</a></li>
+	<li><a href="web-content.html">Web Content &mdash; the classic workflow target</a></li>
+	<li><a href="client-extensions.html#microservice">Microservice CETs &mdash; where real logic lives</a></li>
+	<li><a href="permissions.html">Roles &mdash; who gets the tasks</a></li>
+	<li><a href="templates.html#notification">Notification templates in the template family</a></li>
+	<li><a href="collections.html">Collections &mdash; only approved items appear</a></li>
+</ul>
+
+<h2>A worked example</h2>
+<p>"Employee submits a policy exception; HR approves; requester is emailed; approved exceptions appear on the intranet."</p>
+<ol>
+	<li><a href="objects.html">Object</a> <code>PolicyException</code> with a <code>state</code> picklist field defaulting to <code>submitted</code>.</li>
+	<li>A <a href="forms.html">Form Container</a> on a page creates entries.</li>
+	<li>A Kaleo workflow attached to the object routes new entries to the HR role.</li>
+	<li>An <code>onAfterUpdate</code> object action with condition <code>exceptionStatus == "approved"</code> fires a <code>notification</code> action using an email template.</li>
+	<li>A dynamic <a href="collections.html">collection</a> filtered to approved entries renders the intranet list; Guest needs a company-scope VIEW grant for it to be non-empty.</li>
+</ol>
+<p>Nothing in that list requires custom code. Reach for a <a href="client-extensions.html#objectaction">CET</a> only at step 4, and only if the notification has to leave Liferay.</p>
+
+<h2>Traps</h2>
+<div class="callout warn">
+	<b>onAfterUpdate fires on every update</b>
+	<p>Including the one your own action just made. Always constrain with a <code>conditionExpression</code>, or an action that updates the same object will loop.</p>
+</div>
+<div class="callout warn">
+	<b>Workflow silently hides content</b>
+	<p>Attaching a workflow to a type that already had published items is fine, but every <em>new</em> item now sits in <code>PENDING</code> until someone approves it. Listings render short and nobody gets an error.</p>
+</div>

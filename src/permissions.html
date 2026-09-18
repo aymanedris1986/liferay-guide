@@ -1,0 +1,111 @@
+<!--title: Roles & permissions-->
+<!--subtitle: Who can see and do what. Almost every "it works for me but not for them" bug on a Liferay project is on this page.-->
+
+<h2>The model in one diagram</h2>
+<div class="ascii">  USER ──belongs to──▶ SITE / ORGANIZATION / USER GROUP / ACCOUNT
+    │                            │
+    └──────assigned──────▶  ROLE ──────grants──────▶ ACTION on RESOURCE at SCOPE
+                             │                        (VIEW, UPDATE, ADD_ENTRY…)
+             ┌───────────────┼───────────────┐
+        Regular role    Site role      Organization role
+        (portal-wide)   (per site)     (per org)</div>
+<div class="wrap"><table>
+	<tr><th>Role type</th><th>Applies</th><th>Use for</th></tr>
+	<tr><td>Regular</td><td>Everywhere in the instance</td><td>Administrator, HR Manager (global)</td></tr>
+	<tr><td>Site</td><td>Within one site</td><td>Site Content Editor, Site Member</td></tr>
+	<tr><td>Organization</td><td>Within one org and optionally its children</td><td>Department Head</td></tr>
+	<tr><td>Account</td><td>Within a B2B account</td><td>Commerce buyer, account admin</td></tr>
+</table></div>
+<p>Two roles exist that you never assign: <b>Guest</b> (anyone not signed in) and <b>User</b> (anyone signed in). Guest is where the interesting failures live.</p>
+
+<h2 id="guest">Guest access &mdash; the failure mode</h2>
+<div class="callout trap">
+	<b>Everything on this page fails silently</b>
+	<p>The page returns 200, the entry saves, nothing appears in the log, and it all looks correct to you &mdash; because your session has the access the visitor lacks. These are not error-handling problems; they are "the list is empty and nobody knows why" problems.</p>
+</div>
+
+<h3 id="sap">Gate 1: the Service Access Policy</h3>
+<p>Permissions are the <em>second</em> gate. The first is the <b>Service Access Policy (SAP)</b>, which decides whether a Headless endpoint is reachable at all &mdash; before any permission is consulted. A public <a href="fragments.html">fragment</a> fetching web content fails here while every grant you are staring at is correct.</p>
+<p>A policy is a named set of allowed <b>service signatures</b> &mdash; the implementation method, not the REST path:</p>
+<pre><code>com.liferay.headless.delivery.internal.resource.v1_0.StructuredContentResourceImpl#getStructuredContent
+com.liferay.headless.delivery.internal.resource.v1_0.NavigationMenuResourceImpl#getNavigationMenu</code></pre>
+<p>Author it at <b>Control Panel &rarr; Security &rarr; Service Access Policy</b>, in <b>Advanced Mode</b> (the basic form does not expose raw signatures). Two booleans must both be right:</p>
+<div class="wrap"><table>
+	<tr><th>Field</th><th>Set to</th><th>Why</th></tr>
+	<tr><td>Default</td><td>checked</td><td>A policy applies to unauthenticated requests only when marked default. Liferay unions the company's default entries on every request; a non-default policy is active only when something names it explicitly.</td></tr>
+	<tr><td>Enabled</td><td>checked</td><td>A disabled entry is skipped entirely.</td></tr>
+</table></div>
+<p>Resolve a signature by finding the resource class behind the endpoint &mdash; the <code>internal.resource.v1_0</code> package of the module in the <a href="headless-apis.html">Headless API table</a>.</p>
+<p><b>Necessary but not sufficient.</b> A policy makes the endpoint reachable; the resource still has to be readable. Both gates, or the visitor gets an empty result that looks like missing data.</p>
+
+<h3>Gate 2: the VIEW grant</h3>
+<p>Publishing an <a href="objects.html">object</a> does not make its entries readable. Page-level VIEW does not confer entry-level VIEW, and a server-side <a href="collections.html">Collection</a> does not sidestep it &mdash; it evaluates entry permissions as the visiting user, so an object-backed listing renders <b>empty</b> for Guest while looking right to you.</p>
+
+<h3>An object has two resources</h3>
+<p>The action decides which resource name to grant on. Getting this wrong applies cleanly and grants nothing.</p>
+<div class="wrap"><table>
+	<tr><th>Resource</th><th>Actions</th><th>Guest may hold</th></tr>
+	<tr><td><code>com.liferay.object.model.ObjectEntry#&lt;id&gt;</code> &mdash; what <code>[$OBJECT_DEFINITION_CLASS_NAME:X$]</code> resolves to</td><td>VIEW, UPDATE, DELETE, PERMISSIONS</td><td>VIEW</td></tr>
+	<tr><td><code>com.liferay.object#&lt;id&gt;</code> &mdash; written <code>com.liferay.object#[$OBJECT_DEFINITION_ID:X$]</code></td><td>ADD_OBJECT_ENTRY, PERMISSIONS</td><td>ADD_OBJECT_ENTRY</td></tr>
+</table></div>
+<p>UPDATE, DELETE and PERMISSIONS are <em>guest-unsupported</em> &mdash; ungrantable to Guest at any scope.</p>
+
+<h2 id="scope">Granting in source: <code>resource-permissions.json</code></h2>
+<pre><code>[
+	{
+		"actionIds": ["VIEW"],
+		"primKey": "0",
+		"resourceName": "[$OBJECT_DEFINITION_CLASS_NAME:Policy$]",
+		"roleName": "Guest",
+		"scope": "1"
+	}
+]</code></pre>
+<div class="callout trap">
+	<b><code>scope</code> is the trap</b>
+	<p>It is a <code>ResourceConstants</code> integer, and the wrong value fails silently &mdash; the handler reports no error and grants nothing useful.</p>
+</div>
+<div class="wrap"><table>
+	<tr><th><code>scope</code></th><th>Constant</th><th>Grants</th></tr>
+	<tr><td><code>"1"</code></td><td>SCOPE_COMPANY</td><td>All <b>existing and future</b> entries. <b>This is the one that makes a public listing work.</b></td></tr>
+	<tr><td><code>"2"</code></td><td>SCOPE_GROUP</td><td>The same, limited to the current site</td></tr>
+	<tr><td><code>"3"</code></td><td>SCOPE_GROUP_TEMPLATE</td><td>Only the defaults applied to <b>newly created</b> entries. Does nothing for existing ones.</td></tr>
+	<tr><td><code>"4"</code></td><td>SCOPE_INDIVIDUAL</td><td>One entry, named by <code>primKey</code>. Used by <a href="pages.html">page</a> permissions.</td></tr>
+</table></div>
+<p>Several Liferay-internal initializers use <code>"3"</code>, so it gets copied. For scopes 1 and 2 the handler overwrites <code>primKey</code> with the company or group ID, so <code>"0"</code> is a fine placeholder.</p>
+<div class="callout warn">
+	<b>The handler warns rather than fails</b>
+	<p>A bad <code>resourceName</code> or unknown <code>roleName</code> logs <em>"No resource action found"</em> / <em>"No role found"</em> and carries on. A silent 2&nbsp;ms run with no warning means the grant applied as written &mdash; so if behaviour did not change, suspect <code>scope</code>, not the syntax.</p>
+</div>
+
+<h2>Per-entry permissions</h2>
+<p>Object entries can be permissioned individually via the <b>collaborators</b> API &mdash; "only the requester and their manager can see this leave request". Requires feature flag <code>LPD-17564</code>.</p>
+
+<h2>How to verify &mdash; as the visitor, not as you</h2>
+<pre><code># curl with no --user and no cookie jar IS a Guest request
+curl --silent --url "http://localhost:8080/web/badael/home" &gt; /tmp/page.html
+
+# assert real values are present AND placeholder strings are absent
+grep -c "Annual Leave Policy" /tmp/page.html
+grep -c "{{" /tmp/page.html</code></pre>
+<p>Placeholders still present mean the data did not resolve. Then open it <b>signed out in a browser</b>: <code>curl</code> executes no JavaScript, so anything client-side is unverified until you do.</p>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="objects.html">Objects &mdash; two resources, two grants</a></li>
+	<li><a href="collections.html#empty">Collections &mdash; why the list is empty</a></li>
+	<li><a href="forms.html">Forms &mdash; write-only public objects</a></li>
+	<li><a href="pages.html">Pages &mdash; page-level VIEW</a></li>
+	<li><a href="site-initializers.html">Site initializers &mdash; where grants live in source</a></li>
+	<li><a href="headless-apis.html">Headless APIs &mdash; what SAP gates</a></li>
+	<li><a href="client-extensions.html">CETs &mdash; OAuth scopes are a separate gate again</a></li>
+</ul>
+
+<h2>The three independent gates, in order</h2>
+<div class="ascii">  request ──▶ [1] Service Access Policy   reachable?     no ──▶ 403 / nothing
+                     │ yes
+              [2] OAuth scope (token calls only)          no ──▶ 403
+                     │ yes
+              [3] Permission grant on the resource        no ──▶ 200 with an EMPTY list
+                     │ yes
+                   data</div>
+<p>Note the asymmetry that costs the most time: gates 1 and 2 return an error you can see. Gate 3 returns <b>success with nothing in it</b>.</p>

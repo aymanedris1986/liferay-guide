@@ -1,0 +1,84 @@
+<!--title: Documents & Media-->
+<!--subtitle: The file repository. More than storage — documents are assets, so they get types, metadata, permissions, versioning, and a place in collections.-->
+
+<h2>In one sentence</h2>
+<p><b>Documents &amp; Media</b> is Liferay's file repository: folders of files with versioning, check-out, previews, <a href="taxonomy.html">categories</a>, permissions, and a stable URL &mdash; and, crucially, a <b>reference</b> that other content points at rather than copies.</p>
+
+<h2>Why it is not just a file upload</h2>
+<div class="wrap"><table>
+	<tr><th>Capability</th><th>What it buys you</th></tr>
+	<tr><td>Versioning + check-out</td><td>Replace a PDF and every page linking it updates; roll back if wrong</td></tr>
+	<tr><td>Document Types</td><td>A file type with required <b>metadata fields</b> &mdash; "Policy" documents must have owner, effective date, department</td></tr>
+	<tr><td>Metadata sets</td><td>Reusable groups of metadata fields shared across document types</td></tr>
+	<tr><td>Asset behaviour</td><td><a href="taxonomy.html">Categories and tags</a>, search indexing, related assets</td></tr>
+	<tr><td>Permissions</td><td>Per folder and per document, same model as <a href="permissions.html">everything else</a></td></tr>
+	<tr><td>Previews</td><td>Server-rendered previews for PDFs, images, video, Office files</td></tr>
+	<tr><td>Adaptive media</td><td>Auto-generated image variants for different viewports</td></tr>
+</table></div>
+
+<h2>Document Types vs Content Structures vs Objects</h2>
+<div class="wrap"><table>
+	<tr><th></th><th>Document Type</th><th><a href="content-structures.html">Content Structure</a></th><th><a href="objects.html">Object</a></th></tr>
+	<tr><td>Primary payload</td><td>A file</td><td>Field values</td><td>Field values</td></tr>
+	<tr><td>Extra fields</td><td>Metadata about the file</td><td>The content itself</td><td>The record itself</td></tr>
+	<tr><td>Use for</td><td>Policy PDFs with owner + expiry</td><td>News articles</td><td>Leave requests</td></tr>
+</table></div>
+<div class="callout note">
+	<b>The common intranet question</b>
+	<p>"Policy documents with an owner, a department, and a review date" &mdash; is that a Document Type or an <a href="objects.html">Object</a> with an attachment field?</p>
+	<p><b>Document Type</b> when the file <em>is</em> the thing and the fields describe it. <b>Object</b> when the record is the thing, has a lifecycle or relationships, and the file is one attribute of it. If there is an approval flow, a status, or a link to another record, go Object.</p>
+</div>
+
+<h2>How documents get referenced</h2>
+<div class="wrap"><table>
+	<tr><th>From</th><th>How</th></tr>
+	<tr><td>A <a href="content-structures.html">structure</a> Image or Document field</td><td>Stores a reference; replacing the document updates every article</td></tr>
+	<tr><td>A <a href="fragments.html">fragment</a> editable</td><td><code>data-lfr-editable-type="image"</code> opens the media picker</td></tr>
+	<tr><td>An <a href="objects.html">object</a> Attachment field</td><td>Stores a file entry reference</td></tr>
+	<tr><td>A <a href="site-initializers.html#tokens">site initializer</a></td><td><code>[$DOCUMENT_JSON:/site-initializer/documents/group/&lt;folder&gt;/&lt;file&gt;$]</code></td></tr>
+	<tr><td>A direct URL</td><td><code>/documents/d/&lt;group-name&gt;/&lt;friendly-url&gt;</code></td></tr>
+</table></div>
+<div class="callout warn">
+	<b>Reference, never copy</b>
+	<p>Pasting a document's URL as text into a Rich Text field breaks the reference. Move or rename the file and the link 404s, with nothing warning you. Use the Image/Document field type or the media picker so Liferay tracks the relationship.</p>
+</div>
+
+<h2>Listing documents</h2>
+<p>Documents are assets, so a <a href="collections.html">dynamic collection</a> can select them &mdash; filtered by folder, document type, or <a href="taxonomy.html">category</a> &mdash; and a <a href="fragments.html">fragment</a> renders each row. That is how you build "Policies &amp; Manuals" pages without writing a file browser.</p>
+<div class="ascii">  Documents folder "Policies"
+        │  typed as Document Type "Policy" (owner, department, effective date)
+        │  categorised under vocabulary "Department"
+        ▼
+  Dynamic collection: type = Document, category = HR
+        ▼
+  Collection Display + policy-row fragment  ──▶  page /policies</div>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="content-structures.html">Content Structures &mdash; Image and Document fields</a></li>
+	<li><a href="fragments.html">Fragments &mdash; image editables</a></li>
+	<li><a href="collections.html">Collections &mdash; document listings</a></li>
+	<li><a href="taxonomy.html">Categories &mdash; how documents get filtered</a></li>
+	<li><a href="objects.html">Objects &mdash; attachment fields</a></li>
+	<li><a href="permissions.html">Permissions &mdash; per folder and per file</a></li>
+	<li><a href="headless-apis.html">Headless APIs &mdash; upload and fetch</a></li>
+</ul>
+
+<h2>API</h2>
+<pre><code>POST /o/headless-delivery/v1.0/sites/{siteId}/documents     # multipart upload
+GET  /o/headless-delivery/v1.0/documents/{documentId}</code></pre>
+<p>Note this module uses the <b>numeric</b> <code>siteId</code>, unlike <a href="headless-apis.html">headless-admin-site</a> which uses the ERC.</p>
+
+<h2>Traps</h2>
+<div class="callout trap">
+	<b>Guest needs VIEW on the folder too</b>
+	<p>A public page embedding a private document shows a broken image or a 403 download, while the page itself returns 200. Grant VIEW on the folder, and verify with an unauthenticated <code>curl</code> &mdash; see <a href="permissions.html#guest">Guest access</a>.</p>
+</div>
+<div class="callout warn">
+	<b>Removing a Document Type field orphans its metadata</b>
+	<p>Same rule as <a href="content-structures.html">content structures</a>: values are stored keyed by field, so deleting the field makes them unreachable.</p>
+</div>
+<div class="callout warn">
+	<b>Web Content fields in Document Types are gone</b>
+	<p>Support was discontinued. Any references in old configurations must be removed.</p>
+</div>

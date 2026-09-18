@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Content Templates · Liferay Component Guide</title>
+<meta name="description" content="FreeMarker markup that turns a structure's field values into HTML. Server-side, cached, and swappable without touching a single article.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+	<strong><a href="index.html">Liferay Component Guide</a></strong>
+	<span>DXP 2026.Q2 &middot; what each piece is, and when to reach for it</span>
+</header>
+<div class="shell">
+	<nav class="sidebar" aria-label="Components">
+			<h4>Start here</h4>
+			<ul>
+				<li><a href="index.html">Overview & map</a></li>
+				<li><a href="decision-guide.html">What should I use?</a></li>
+			</ul>
+			<h4>Content</h4>
+			<ul>
+				<li><a href="web-content.html">Web Content (articles)</a></li>
+				<li><a href="content-structures.html">Content Structures</a></li>
+				<li><a aria-current="page" href="web-content-templates.html">Web Content Templates</a></li>
+				<li><a href="documents-media.html">Documents & Media</a></li>
+				<li><a href="taxonomy.html">Categories, Tags & Assets</a></li>
+			</ul>
+			<h4>Pages & layout</h4>
+			<ul>
+				<li><a href="pages.html">Pages & page types</a></li>
+				<li><a href="fragments.html">Fragments</a></li>
+				<li><a href="collections.html">Collections</a></li>
+				<li><a href="templates.html">All template types</a></li>
+				<li><a href="theme-design.html">Themes & style books</a></li>
+				<li><a href="personalization.html">Segments & experiences</a></li>
+			</ul>
+			<h4>Data & logic</h4>
+			<ul>
+				<li><a href="objects.html">Objects</a></li>
+				<li><a href="forms.html">Forms</a></li>
+				<li><a href="workflow.html">Workflow & notifications</a></li>
+				<li><a href="permissions.html">Roles & permissions</a></li>
+			</ul>
+			<h4>Extend & integrate</h4>
+			<ul>
+				<li><a href="client-extensions.html">Client extensions</a></li>
+				<li><a href="widgets-modules.html">Widgets & OSGi modules</a></li>
+				<li><a href="headless-apis.html">Headless APIs</a></li>
+				<li><a href="site-initializers.html">Site initializers</a></li>
+			</ul>
+	</nav>
+	<main id="main">
+		<h1>Web Content Templates</h1>
+		<p class="lede">FreeMarker markup that turns a structure's field values into HTML. Server-side, cached, and swappable without touching a single article.</p>
+
+<h2>In one sentence</h2>
+<p>A <b>Web Content Template</b> is a FreeMarker script attached to a <a href="content-structures.html">Content Structure</a>. It receives the field values of one <a href="web-content.html">article</a> and outputs HTML.</p>
+
+<h2>What it actually is</h2>
+<p>Liferay hands your template variables named after the structure's fields. You write ordinary HTML with FreeMarker directives around it. The output is rendered on the server and cached &mdash; no JavaScript, no client round-trip, and it works for search engines and for visitors with JS disabled.</p>
+<pre><code>&lt;article class="news-card"&gt;
+	&lt;h3&gt;${headline.getData()}&lt;/h3&gt;
+
+	&lt;#if summary.getData()?has_content&gt;
+		&lt;p&gt;${summary.getData()}&lt;/p&gt;
+	&lt;/#if&gt;
+
+	&lt;#if heroImage.getData()?has_content&gt;
+		&lt;img alt="" src="${heroImage.getData()}"&gt;
+	&lt;/#if&gt;
+&lt;/article&gt;</code></pre>
+<p>Repeatable fields and field sets become lists you iterate:</p>
+<pre><code>&lt;ul&gt;
+	&lt;#list links.getSiblings() as link&gt;
+		&lt;li&gt;&lt;a href="${link.url.getData()}"&gt;${link.label.getData()}&lt;/a&gt;&lt;/li&gt;
+	&lt;/#list&gt;
+&lt;/ul&gt;</code></pre>
+
+<h3>Useful things in scope</h3>
+<div class="wrap"><table>
+	<tr><th>Variable / helper</th><th>What it gives you</th></tr>
+	<tr><td><code>&lt;fieldName&gt;.getData()</code></td><td>The field's value for the current locale</td></tr>
+	<tr><td><code>&lt;fieldName&gt;.getSiblings()</code></td><td>All repetitions of a repeatable field</td></tr>
+	<tr><td><code>.vars['reserved-article-id'].data</code></td><td>Article ID, title, URL title and other reserved values</td></tr>
+	<tr><td><code>themeDisplay</code></td><td>Current site, user, locale, portal URL</td></tr>
+	<tr><td><code>serviceLocator</code></td><td>Any OSGi service &mdash; powerful and <a href="#trap-servicelocator">usually disabled</a></td></tr>
+	<tr><td><code>restClient.get("/c/…")</code></td><td>Call a Headless endpoint from the template (also available in FreeMarker <a href="fragments.html">fragments</a>)</td></tr>
+	<tr><td><code>request.getAttribute("INFO_ITEM")</code></td><td>On a <a href="templates.html#display">display page</a>: the item being displayed</td></tr>
+</table></div>
+
+<h2>The template family &mdash; don't confuse these</h2>
+<p>FreeMarker shows up in four places that look alike and are scoped differently:</p>
+<div class="wrap"><table>
+	<tr><th>Kind</th><th>Renders</th><th>Attached to</th></tr>
+	<tr><td><b>Web Content Template</b></td><td>One article's fields</td><td>A <a href="content-structures.html">Content Structure</a></td></tr>
+	<tr><td><b>Application Display Template (ADT)</b></td><td>A widget's list output &mdash; Asset Publisher, Documents, Categories Navigation, Breadcrumb</td><td>A widget type</td></tr>
+	<tr><td><b>Fragment (FreeMarker)</b></td><td>A page building block</td><td>A <a href="fragments.html">fragment</a>, with <code>configuration.*</code> in scope</td></tr>
+	<tr><td><b>Notification template</b></td><td>An email or notification body</td><td>A <a href="workflow.html#notifications">notification</a>, using <code>[%TOKEN%]</code> syntax, not FreeMarker</td></tr>
+</table></div>
+<p>All of these and the page-layout ones are laid out side by side on <a href="templates.html">All template types</a>.</p>
+
+<h2>When to use a template vs a fragment</h2>
+<div class="wrap"><table>
+	<tr><th>Use a Web Content Template when</th><th>Use a <a href="fragments.html">Fragment</a> when</th></tr>
+	<tr><td>The markup belongs to the <em>content type</em> &mdash; every news article should look like this everywhere</td><td>The markup belongs to the <em>page</em> &mdash; this hero looks like this on this layout</td></tr>
+	<tr><td>You need loops and conditionals over repeatable fields</td><td>You want editors to drag, drop, configure, and edit in place</td></tr>
+	<tr><td>The output is reused by widgets and display pages alike</td><td>You need per-placement configuration options</td></tr>
+	<tr><td>You want zero page-editor involvement</td><td>You want the page editor to own the composition</td></tr>
+</table></div>
+<div class="callout note">
+	<b>They compose</b>
+	<p>The common pattern is both: a <a href="fragments.html">Collection Display fragment</a> renders the list, and each item is rendered by the structure's card template. The fragment owns the grid; the template owns the card.</p>
+</div>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="content-structures.html">Content Structure &mdash; supplies the fields</a></li>
+	<li><a href="web-content.html">Web Content &mdash; the data rendered</a></li>
+	<li><a href="collections.html">Collections &mdash; where card templates get used</a></li>
+	<li><a href="templates.html#display">Display Page Templates &mdash; where full templates get used</a></li>
+	<li><a href="fragments.html">Fragments &mdash; the page-level alternative</a></li>
+	<li><a href="templates.html">All template types &mdash; the disambiguation table</a></li>
+</ul>
+
+<h2>Traps</h2>
+<div class="callout trap" id="trap-servicelocator">
+	<b>serviceLocator is usually off</b>
+	<p>Templates that reach into OSGi services via <code>serviceLocator</code> are blocked by default on current DXP, for the same reason <a href="workflow.html#groovy">Groovy object actions</a> are: enabling it permits arbitrary code execution from the content editor. Prefer <code>restClient</code> or a <a href="client-extensions.html">CET</a>. Design for it being off.</p>
+</div>
+<div class="callout trap">
+	<b>A missing field throws, it does not blank</b>
+	<p>Referencing a field the structure does not define raises a FreeMarker error and the whole block fails to render. Guard optional fields with <code>?has_content</code>, and after any <a href="content-structures.html">structure change</a> re-check every template bound to it.</p>
+</div>
+<div class="callout warn">
+	<b>Templates are per-structure, and that binding is by key</b>
+	<p>Both the structure and the template are referenced by key (<code>ddmStructureKey</code>, <code>ddmTemplateKey</code>) in <a href="site-initializers.html">initializer</a> files and API payloads. Renaming the display name is safe; changing the key breaks the link with no error at build time.</p>
+</div>
+<div class="callout warn">
+	<b>Escaping</b>
+	<p><code>${field.getData()}</code> on a Rich Text field emits raw HTML by design. On a Text field that an editor controls, that is an injection surface &mdash; use <code>?html</code> when the value should be treated as text.</p>
+</div>
+		<footer class="pagefoot">
+			Part of the <a href="index.html">Liferay Component Guide</a>.
+			Not sure which component fits? Start at <a href="decision-guide.html">What should I use?</a>
+		</footer>
+	</main>
+</div>
+</body>
+</html>

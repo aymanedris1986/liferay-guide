@@ -1,0 +1,98 @@
+<!--title: What should I use?-->
+<!--subtitle: Decision tables for the questions that actually come up. Find your sentence in the left column; the right column is the answer and the reason.-->
+
+<h2>"I need to store some data"</h2>
+<div class="wrap"><table>
+	<tr><th>Situation</th><th>Use</th><th>Why not the other one</th></tr>
+	<tr>
+		<td>Marketing copy, news articles, hero text, FAQs &mdash; written by editors, translated, versioned, approved</td>
+		<td><a href="web-content.html">Web Content</a> + <a href="content-structures.html">Content Structure</a></td>
+		<td>An Object gives you no versioning, no translation UI, and no rich-text editing worth the name</td>
+	</tr>
+	<tr>
+		<td>Leave requests, tickets, assets, employees &mdash; records with fields, relations, status, validation</td>
+		<td><a href="objects.html">Object</a></td>
+		<td>Web Content has no relationships, no queryable fields, and no per-record permissions worth using</td>
+	</tr>
+	<tr>
+		<td>PDFs, images, videos, policy documents</td>
+		<td><a href="documents-media.html">Documents &amp; Media</a></td>
+		<td>Storing binaries as Object fields loses the preview, the checkout/versioning, and the CDN path</td>
+	</tr>
+	<tr>
+		<td>A fixed list of options: status values, departments, priorities</td>
+		<td><a href="objects.html#picklists">Picklist</a> (list type definition)</td>
+		<td>Hard-coding the list in a fragment means editors cannot change it</td>
+	</tr>
+	<tr>
+		<td>Labels used to group and filter content across types</td>
+		<td><a href="taxonomy.html">Categories</a> (vocabulary) or tags</td>
+		<td>A field on the structure cannot be filtered on by a <a href="collections.html">dynamic collection</a></td>
+	</tr>
+	<tr>
+		<td>Data that lives in SAP, an external DB, or another SaaS</td>
+		<td><a href="client-extensions.html#objectentrymanager">Object Entry Manager CET</a></td>
+		<td>Copying the data into Liferay means you now own a sync problem</td>
+	</tr>
+</table></div>
+
+<h2>"I need to show it on a page"</h2>
+<div class="wrap"><table>
+	<tr><th>Situation</th><th>Use</th><th>Notes</th></tr>
+	<tr><td>One specific article in one specific spot</td><td><a href="fragments.html">Fragment</a> with a mapped field, or the Web Content Display widget</td><td>Mapping beats pasting: editors update the article, the page follows</td></tr>
+	<tr><td>A list of the latest N items, updating itself</td><td><a href="collections.html">Dynamic collection</a> + Collection Display fragment</td><td>Filter by type, <a href="taxonomy.html">category</a>, site; and sort</td></tr>
+	<tr><td>A hand-picked list in a specific order</td><td><a href="collections.html#manual">Manual collection</a></td><td>Editors reorder by drag; the page itself does not change</td></tr>
+	<tr><td>A landing page per article/record, generated automatically</td><td><a href="templates.html#display">Display Page Template</a></td><td>One template, unlimited URLs &mdash; never build these by hand</td></tr>
+	<tr><td>The same header and footer on every page</td><td><a href="templates.html#master">Master Page Template</a></td><td>Put the page body in a DropZone</td></tr>
+	<tr><td>A starting layout editors copy for each new page</td><td><a href="templates.html#pagetemplate">Page Template</a></td><td>Copied at creation; later edits do <em>not</em> propagate</td></tr>
+	<tr><td>Markup that renders content fields with loops and conditionals</td><td><a href="web-content-templates.html">Web Content Template</a> (FreeMarker)</td><td>Server-side, cached, no JavaScript needed</td></tr>
+	<tr><td>An interactive widget &mdash; chart, wizard, live search</td><td><a href="client-extensions.html#customelement">Custom Element CET</a> (React)</td><td>A fragment can carry JS too; go CET when it is a real app</td></tr>
+</table></div>
+
+<h2>"I need to add custom code"</h2>
+<div class="wrap"><table>
+	<tr><th>Situation</th><th>Use</th><th>Type</th></tr>
+	<tr><td>Run logic when a record is created or updated</td><td><a href="client-extensions.html#objectaction">Object Action CET</a>, or a no-code object action</td><td><code>objectAction</code></td></tr>
+	<tr><td>Reject a save when business rules fail</td><td><a href="client-extensions.html#objectvalidationrule">Object Validation Rule CET</a></td><td><code>objectValidationRule</code></td></tr>
+	<tr><td>Send an SMS / push / Teams message on an event</td><td><a href="client-extensions.html#notificationtype">Notification Type CET</a></td><td><code>notificationType</code></td></tr>
+	<tr><td>Auto-approve or route a workflow step</td><td><a href="client-extensions.html#workflowaction">Workflow Action CET</a></td><td><code>workflowAction</code></td></tr>
+	<tr><td>One CSS file on every page in the instance</td><td><a href="client-extensions.html#globalcss">Global CSS CET</a></td><td><code>globalCSS</code></td></tr>
+	<tr><td>Brand colours, fonts, Clay variable overrides</td><td><a href="theme-design.html">themeCSS CET</a> + <a href="theme-design.html#stylebook">style book</a></td><td><code>themeCSS</code></td></tr>
+	<tr><td>Embed an existing external app</td><td><a href="client-extensions.html#iframe">iFrame CET</a></td><td><code>iframe</code></td></tr>
+	<tr><td>Something only possible inside the JVM (custom service, indexer, portlet SPI)</td><td><a href="widgets-modules.html">OSGi module</a></td><td>Last resort &mdash; blocks SaaS and complicates upgrades</td></tr>
+</table></div>
+
+<h2>"How do I make it repeatable across environments?"</h2>
+<div class="wrap"><table>
+	<tr><th>Artifact</th><th>Reproducible from source?</th><th>How</th></tr>
+	<tr><td>Fragments, pages, master pages, style books, roles, permissions</td><td>Yes</td><td><a href="site-initializers.html">Site initializer</a> tree</td></tr>
+	<tr><td>Object definitions, fields, relationships, picklists</td><td>Yes</td><td>Initializer <code>object-definitions/</code>, or the <a href="headless-apis.html">object-admin API</a> in a script</td></tr>
+	<tr><td>Object <em>entries</em> (runtime data)</td><td>Seed only</td><td><code>object-entries/</code> seeds; real data never belongs in source</td></tr>
+	<tr><td>themeCSS selection under Design &rarr; Theme</td><td><b>No</b></td><td>Manual step, lost on every reprovision &mdash; see <a href="theme-design.html#trap">the trap</a></td></tr>
+	<tr><td>Web content articles</td><td>Yes (seed)</td><td><code>journal-articles/*.xml</code> + <code>.json</code></td></tr>
+</table></div>
+
+<h2>Cost ladder &mdash; reach for the cheapest thing that works</h2>
+<div class="ascii">cheapest ─────────────────────────────────────────────────────────────▶ most expensive
+
+ Style book token   Fragment config   Fragment + JS   Web content template   Object action (no-code)
+        │                 │                 │                  │                      │
+        └── no deploy ────┴── no deploy ────┴─ reprovision ─────┴── no deploy ─────────┘
+
+                    Client Extension (CET)            OSGi module
+                    ├─ deploy, own lifecycle          ├─ deploys into the JVM
+                    ├─ works on SaaS                  ├─ self-hosted only
+                    └─ survives upgrades              └─ re-test every upgrade</div>
+<p>Most "we need a customisation" requests are solved one or two rungs to the left of where the team starts. Ask what the cheapest rung that satisfies the requirement is, then stop there.</p>
+
+<h2>Common mistakes, and what to do instead</h2>
+<div class="wrap"><table>
+	<tr><th>Mistake</th><th>Instead</th></tr>
+	<tr><td>Pasting a whole HTML template into one fragment or custom element</td><td>Split into header/footer fragments on a <a href="templates.html#master">master page</a>, plus body fragments on the <a href="pages.html">content page</a></td></tr>
+	<tr><td>Building one page per news article by hand</td><td>One <a href="templates.html#display">display page template</a> and a <a href="collections.html">collection</a> for the index</td></tr>
+	<tr><td>Fetching a <a href="objects.html#picklists">picklist</a> over REST from a public form's JavaScript</td><td>Ship the options in the fragment markup &mdash; Guest gets <b>403</b> on that endpoint (<a href="permissions.html#guest">why</a>)</td></tr>
+	<tr><td>Counting submissions in the browser on a public page</td><td>Denormalize with an <a href="objects.html#aggregation">Aggregation field</a> &mdash; Guest reads <code>0</code> and the arithmetic silently lies</td></tr>
+	<tr><td>Putting a <code>siteInitializer</code> and a <code>themeCSS</code> in one CET project</td><td>Sibling projects &mdash; the classifications cannot mix (<a href="client-extensions.html#grouping">rule</a>)</td></tr>
+	<tr><td>Writing an OSGi module because "we need custom logic"</td><td>Check the CET table above first; most cases are a microservice CET</td></tr>
+	<tr><td>Editing the live site as the source of truth</td><td>Edit the <a href="site-initializers.html">initializer tree</a> and reprovision</td></tr>
+</table></div>

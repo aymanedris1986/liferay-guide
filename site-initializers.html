@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Site initializers · Liferay Component Guide</title>
+<meta name="description" content="A whole site as version-controlled source. The single most important architectural decision on a Liferay project — and the one with the most silent failure modes.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+	<strong><a href="index.html">Liferay Component Guide</a></strong>
+	<span>DXP 2026.Q2 &middot; what each piece is, and when to reach for it</span>
+</header>
+<div class="shell">
+	<nav class="sidebar" aria-label="Components">
+			<h4>Start here</h4>
+			<ul>
+				<li><a href="index.html">Overview & map</a></li>
+				<li><a href="decision-guide.html">What should I use?</a></li>
+			</ul>
+			<h4>Content</h4>
+			<ul>
+				<li><a href="web-content.html">Web Content (articles)</a></li>
+				<li><a href="content-structures.html">Content Structures</a></li>
+				<li><a href="web-content-templates.html">Web Content Templates</a></li>
+				<li><a href="documents-media.html">Documents & Media</a></li>
+				<li><a href="taxonomy.html">Categories, Tags & Assets</a></li>
+			</ul>
+			<h4>Pages & layout</h4>
+			<ul>
+				<li><a href="pages.html">Pages & page types</a></li>
+				<li><a href="fragments.html">Fragments</a></li>
+				<li><a href="collections.html">Collections</a></li>
+				<li><a href="templates.html">All template types</a></li>
+				<li><a href="theme-design.html">Themes & style books</a></li>
+				<li><a href="personalization.html">Segments & experiences</a></li>
+			</ul>
+			<h4>Data & logic</h4>
+			<ul>
+				<li><a href="objects.html">Objects</a></li>
+				<li><a href="forms.html">Forms</a></li>
+				<li><a href="workflow.html">Workflow & notifications</a></li>
+				<li><a href="permissions.html">Roles & permissions</a></li>
+			</ul>
+			<h4>Extend & integrate</h4>
+			<ul>
+				<li><a href="client-extensions.html">Client extensions</a></li>
+				<li><a href="widgets-modules.html">Widgets & OSGi modules</a></li>
+				<li><a href="headless-apis.html">Headless APIs</a></li>
+				<li><a aria-current="page" href="site-initializers.html">Site initializers</a></li>
+			</ul>
+	</nav>
+	<main id="main">
+		<h1>Site initializers</h1>
+		<p class="lede">A whole site as version-controlled source. The single most important architectural decision on a Liferay project — and the one with the most silent failure modes.</p>
+
+<h2>In one sentence</h2>
+<p>A <b>site initializer</b> is a <a href="client-extensions.html">client extension</a> of type <code>siteInitializer</code> whose directory tree describes an entire site &mdash; <a href="pages.html">pages</a>, <a href="fragments.html">fragments</a>, <a href="objects.html">objects</a>, roles, <a href="permissions.html">permissions</a>, content, <a href="theme-design.html#stylebook">style books</a> &mdash; and creates it on deploy.</p>
+<div class="callout good">
+	<b>The principle</b>
+	<p>The initializer tree is the <b>single source of truth</b>. Build the site by triggering the initializer; iterate by editing the source and reapplying. Never hand-edit the live site as the authoritative copy.</p>
+</div>
+
+<h2>The tree</h2>
+<div class="ascii">client-extensions/&lt;name&gt;/
+├── client-extension.yaml
+└── site-initializer/
+    ├── documents/group/&lt;folder&gt;/…            media
+    ├── fragments/group/&lt;collection-key&gt;/
+    │   ├── collection.json
+    │   └── fragments/&lt;fragment-name&gt;/…       ← "fragments" nesting level is required
+    ├── journal-articles/&lt;name&gt;.{xml,json}    web content
+    ├── layout-page-templates/
+    │   ├── display-page-templates/&lt;name&gt;/
+    │   └── master-pages/&lt;name&gt;/              master-page.json + page-definition.json
+    ├── layout-set/public/metadata.json       theme + chrome settings
+    ├── layouts/&lt;NN-page&gt;/                    NN prefix controls creation order
+    │   ├── page.json
+    │   ├── page-definition.json
+    │   └── &lt;NN-child-page&gt;/…                 nested pages
+    ├── list-type-definitions/&lt;name&gt;.json     picklists
+    ├── object-definitions/&lt;NN-name&gt;.json
+    ├── object-relationships/, object-fields/, object-actions/, object-entries/
+    ├── resource-permissions.json             role grants
+    ├── roles.json
+    ├── site-navigation-menus.json
+    ├── style-books/&lt;name&gt;/style-book.json
+    └── thumbnail.png</div>
+
+<h3>Handler order</h3>
+<p>Handlers run in a fixed order, so a file may reference anything an earlier handler produced:</p>
+<div class="ascii">list-type-definitions → object-folders → object-definitions → object-relationships
+  → object-fields → publishObjectDefinitions → object-actions → object-entries</div>
+<p>Because publishing happens <em>after</em> creation, <b>omit <code>status</code> from an object definition file</b> &mdash; the initializer publishes it for you.</p>
+<p>Each file holds a single <b>raw DTO</b> &mdash; no <code>configuration</code> wrapper, no <code>items</code> array.</p>
+
+<h2 id="reprovision">Applying a change</h2>
+<div class="wrap"><table>
+	<tr><th>Change</th><th>How to apply it</th><th>Reprovision?</th></tr>
+	<tr><td>Theme / design</td><td>Deploy the <a href="theme-design.html#themecss">themeCSS CET</a></td><td>No</td></tr>
+	<tr><td>Object definition or data</td><td><code>object-admin</code> API, or edit the tree and reprovision</td><td>No</td></tr>
+	<tr><td>Fragment content, or a new fragment</td><td>Edit the source tree, then reprovision</td><td><b>Yes</b></td></tr>
+	<tr><td>New page, page composition, fragment placement</td><td>Delete the site, recreate from the initializer</td><td><b>Yes</b></td></tr>
+</table></div>
+<p>The initializer runs <b>once, at site creation</b>. Redeploying does not update an existing site. Re-triggering upserts pages but does <em>not</em> retrofit composition changes onto pages that already exist.</p>
+
+<h3>The reprovision cycle</h3>
+<pre><code>#!/usr/bin/env bash
+set -o errexit -o nounset -o pipefail
+
+SITE_ERC="${SITE_ERC:?}"      # e.g. badael-home-template
+SITE_NAME="${SITE_NAME:?}"    # the "Initializing &lt;name&gt;" log string
+CET="${CET:?}"                # the client-extensions/&lt;CET&gt; directory
+PORT="${PORT:-8080}"
+LOG=bundles/tomcat/logs/catalina.out
+
+before=$(grep --count "Initializing ${SITE_NAME}" "${LOG}" || echo 0)
+
+curl --output /dev/null --request DELETE --silent \
+	--url "http://localhost:${PORT}/o/headless-admin-site/v1.0/sites/${SITE_ERC}" \
+	--user "test@liferay.com:test"
+
+rm -f "bundles/osgi/client-extensions/${CET}.zip"
+(cd "client-extensions/${CET}" &amp;&amp; blade gw clean deploy &gt;/dev/null)
+
+for _ in $(seq 1 100); do
+	[[ $(grep --count "Initializing ${SITE_NAME}" "${LOG}" || echo 0) -gt ${before} ]] &amp;&amp; break
+	sleep 3
+done
+
+sleep 6   # handlers keep logging after the "Initializing" line
+
+awk -v n=$((before + 1)) '/Initializing '"${SITE_NAME}"'/{c++} c&gt;=n' "${LOG}" \
+	| grep --extended-regexp 'Invoking|Initialized|InitializationException|MustNotBeReserved'</code></pre>
+<div class="callout trap">
+	<b>Two things go wrong when you do this by hand</b>
+	<p><b>1.</b> <code>before</code> must be read <em>before</em> the delete. Read it late and you compare the new run against itself; the loop spins out on a build that actually succeeded.</p>
+	<p><b>2.</b> The <code>Initializing</code> line is <em>not</em> the end of the run. Handlers keep logging after it, so sampling immediately shows a partial list and a missing handler reads as a failure.</p>
+</div>
+<div class="callout trap">
+	<b><code>blade gw deploy</code> with no source change rewrites nothing</b>
+	<p>Liferay re-triggers the initializer when the file-install watcher sees a <b>changed zip</b>, not when Gradle runs. Gradle's up-to-date check is content-based, so a redeploy with no edit prints <code>BUILD SUCCESSFUL</code> / "N up to date" and your site stays deleted. Hence the <code>rm -f</code> and <code>clean</code> above.</p>
+</div>
+<div class="callout warn">
+	<b>Sites are addressed by ERC in that DELETE path</b>
+	<p>A numeric site ID returns <b>404</b>. Same rule across <code>headless-admin-site</code> &mdash; see <a href="headless-apis.html">Headless APIs</a>.</p>
+</div>
+
+<h2 id="tokens">Token substitution</h2>
+<p>Every file is passed through token replacement before it is parsed. Delimiters are <code>[$</code> and <code>$]</code>. This is how a file references an entity whose numeric ID cannot be known when you write it.</p>
+<div class="wrap"><table>
+	<tr><th>Token</th><th>Resolves to</th></tr>
+	<tr><td><code>[$GROUP_ID$]</code>, <code>[$GROUP_KEY$]</code>, <code>[$GROUP_FRIENDLY_URL$]</code></td><td>Current site</td></tr>
+	<tr><td><code>[$COMPANY_ID$]</code>, <code>[$PORTAL_URL$]</code></td><td>Instance context</td></tr>
+	<tr><td><code>[$OBJECT_DEFINITION_ID:X$]</code> / <code>[$OBJECT_DEFINITION_CLASS_NAME:X$]</code></td><td><a href="objects.html">Object</a> ID / class name</td></tr>
+	<tr><td><code>[$LIST_TYPE_DEFINITION_ID:X$]</code></td><td>Picklist ID</td></tr>
+	<tr><td><code>[$ROLE_ID:X$]</code>, <code>[$LAYOUT_ID:/url$]</code></td><td>Role / page</td></tr>
+	<tr><td><code>[$DOCUMENT_JSON:/path$]</code>, <code>[$DOCUMENT_URL:name$]</code></td><td><a href="documents-media.html">Document</a> reference</td></tr>
+	<tr><td><code>[$JOURNAL_ARTICLE_ID:erc$]</code>, <code>[$DDM_STRUCTURE_ID:X$]</code></td><td><a href="web-content.html">Content</a> IDs</td></tr>
+</table></div>
+<div class="callout note">
+	<b>Object tokens are the exception &mdash; they see the whole company</b>
+	<p>Most tokens are registered by the handler that creates the entity, so they resolve only for entities in <em>this tree</em>. Object definitions are exempt: the handler runs a company-wide pass <em>before</em> reading any file, registering tokens for <b>every published object definition in the company</b>, whoever created it.</p>
+	<p>So a tree can freely reference objects created live over <code>object-admin</code> &mdash; <code>resource-permissions.json</code>, <code>object-actions/</code>, and <code>object-relationships/</code> all resolve against them. Two conditions: the object must be <b>published</b> (drafts register nothing), and the token key is the definition's short name.</p>
+	<p>Do not generalise this. <code>[$LIST_TYPE_DEFINITION_ID:X$]</code> is registered inside the per-file loop, so it resolves for picklists in this tree only.</p>
+</div>
+
+<h2>Verifying what actually happened</h2>
+<pre><code>grep --extended-regexp 'Initializing|Invoking (addOrUpdateListTypeDefinitions|addObjectDefinitions|addOrUpdateObjectRelationships|addOrUpdateLayouts|addOrUpdateLayoutsContent|addLayoutPageTemplates|addStyleBookEntries|addFragmentEntries|addOrUpdateResourcePermissions)' \
+	bundles/tomcat/logs/catalina.out | tail -20</code></pre>
+<p>The signal is the <b>jump between runs</b>, not the absolute number:</p>
+<pre><code>Invoking addStyleBookEntries took 1 ms      &lt;- before: directory absent
+Invoking addStyleBookEntries took 21 ms     &lt;- after: files found
+Invoking addLayoutPageTemplates took 0 ms   &lt;- before: no master page
+Invoking addLayoutPageTemplates took 134 ms &lt;- after: master page imported</code></pre>
+<div class="wrap"><table>
+	<tr><th>Gotcha</th><th>Detail</th></tr>
+	<tr><td>Fragments log as <code>addFragmentEntries</code></td><td>No <code>addOrUpdate</code> prefix. Grepping for <code>addOrUpdateFragmentEntries</code> matches nothing, which reads exactly like the directory was never found.</td></tr>
+	<tr><td>Navigation menus log <b>nothing</b></td><td>That handler runs inside <code>addOrUpdateLayoutsContent</code>. Its absence proves nothing &mdash; count menu items over REST instead.</td></tr>
+	<tr><td>A flat timing is a hint, not a verdict</td><td>Single-file handlers can apply correctly and still round to 1 ms. Assert the outcome.</td></tr>
+	<tr><td>Timestamps are UTC</td><td>Your shell probably is not. A line that looks hours ahead may be the current run.</td></tr>
+</table></div>
+<p>A failed initialization <b>rolls the site back</b>, so "the site does not exist" and "the initializer threw" are the same symptom:</p>
+<pre><code>grep --extended-regexp 'InitializationException|MustNotBeReserved|Unable to transform' \
+	bundles/tomcat/logs/catalina.out | head</code></pre>
+
+<h2>What the tree does and does not rebuild</h2>
+<div class="wrap"><table>
+	<tr><th>Rebuilt from source</th><th>Not rebuilt</th></tr>
+	<tr><td>Pages, fragments, masters, style books, menus</td><td>The <a href="theme-design.html#trap">themeCSS selection</a> &mdash; manual, every time</td></tr>
+	<tr><td>Objects, picklists, relationships, actions, permissions</td><td>Runtime <a href="objects.html">object entries</a> (they survive instead, being company-scoped)</td></tr>
+	<tr><td>Roles and grants</td><td>Anything an admin changed in the UI and did not port back</td></tr>
+	<tr><td>Seeded web content and documents</td><td>Editor-authored content created after provisioning</td></tr>
+</table></div>
+<p>Say plainly which half of the data layer your tree rebuilds. A mixed layout &mdash; objects managed live, their logic and permissions authored in the tree &mdash; is workable and common; it just needs to be stated rather than assumed.</p>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="client-extensions.html">Client extensions &mdash; the packaging</a></li>
+	<li><a href="pages.html">Pages &mdash; <code>layouts/</code></a></li>
+	<li><a href="fragments.html">Fragments &mdash; <code>fragments/group/</code></a></li>
+	<li><a href="objects.html">Objects &mdash; <code>object-definitions/</code></a></li>
+	<li><a href="permissions.html#scope">Permissions &mdash; <code>resource-permissions.json</code></a></li>
+	<li><a href="theme-design.html">Style books &mdash; what survives</a></li>
+	<li><a href="templates.html#sitetemplate">Site templates &mdash; the alternative</a></li>
+</ul>
+
+<h2>Traps recap</h2>
+<div class="callout trap">
+	<b>No <code>batch/</code> directory exists here</b>
+	<p><code>*.batch-engine-data.json</code> files are packaged and silently ignored. The only signal is <code>Invoking addOrUpdateListTypeDefinitions took 0 ms</code>. That envelope belongs to the separate <code>batch</code> CET type.</p>
+</div>
+<div class="callout trap">
+	<b>Never copy <code>"system": true</code></b>
+	<p>Portal-internal initializers (seo-studio, ai-hub) set it. Copied into your tree it makes the object or picklist non-modifiable.</p>
+</div>
+<div class="callout warn">
+	<b>The <code>fragments</code> nesting level is not optional</b>
+	<p><code>fragments/group/&lt;collection&gt;/fragments/&lt;name&gt;/</code>. Drop the second <code>fragments</code> and the handler finds nothing, logs 1 ms, and the site provisions with no fragments &mdash; so every page that references one renders blank.</p>
+</div>
+		<footer class="pagefoot">
+			Part of the <a href="index.html">Liferay Component Guide</a>.
+			Not sure which component fits? Start at <a href="decision-guide.html">What should I use?</a>
+		</footer>
+	</main>
+</div>
+</body>
+</html>

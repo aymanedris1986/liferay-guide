@@ -1,0 +1,130 @@
+<!--title: Pages & page types-->
+<!--subtitle: Where everything else ends up. Five page types, three vocabularies for the word "type", and the composition tree that a page definition actually is.-->
+
+<h2>In one sentence</h2>
+<p>A <b>page</b> is a URL in a site's navigation tree, with a type that decides how its body is produced &mdash; composed from <a href="fragments.html">fragments</a>, filled with <a href="widgets-modules.html">widgets</a>, or pointed somewhere else entirely.</p>
+
+<h2>The page types</h2>
+<div class="wrap"><table>
+	<tr><th>Type</th><th>What it is</th><th>Use for</th></tr>
+	<tr><td><b>Content Page</b></td><td>Fragment-composed layout, edited in the page editor. The default.</td><td>Everything, unless you have a specific reason not to</td></tr>
+	<tr><td><b>Widget Page</b></td><td>Legacy portlet layout with column templates</td><td>Old portlet apps; compatibility only</td></tr>
+	<tr><td><b>Link to URL</b></td><td>A navigation node that redirects</td><td>External links inside the menu</td></tr>
+	<tr><td><b>Embedded</b></td><td>An iframe to an external URL, inside your chrome</td><td>Wrapping a third-party tool</td></tr>
+	<tr><td><b>Full Page Application</b></td><td>One widget occupying the whole page, own URL space</td><td>An app-like experience</td></tr>
+</table></div>
+
+<div class="callout warn">
+	<b>Three "type" vocabularies &mdash; do not mix them</b>
+	<p>The internal layout key is <code>content</code>/<code>portlet</code>/<code>url</code>/<code>embedded</code>. The <code>headless-admin-site</code> API enum is <code>ContentPage</code>/<code>WidgetPage</code>/<code>LinkToURLPage</code>/<code>EmbeddedPage</code>/<code>PageSetPage</code>/<code>LinkToPagePage</code>. A <a href="site-initializers.html">site initializer</a> <code>page.json</code> uses <code>Content</code>/<code>Portlet</code>/<code>URL</code>/<code>Embedded</code>. And <code>headless-delivery</code> has its own <code>pageType</code> field. Copying a value from the wrong table is a 400 at best and a wrong page type at worst.</p>
+</div>
+
+<h2>Public vs private, hidden vs visible</h2>
+<div class="wrap"><table>
+	<tr><th>Flag</th><th>Meaning</th></tr>
+	<tr><td><code>private: false</code></td><td>In the public page set. Still needs a Guest VIEW grant to actually be public &mdash; see <a href="permissions.html">Permissions</a>.</td></tr>
+	<tr><td><code>private: true</code></td><td>In the private page set; requires site membership.</td></tr>
+	<tr><td><code>hidden: true</code></td><td>Reachable by URL, omitted from navigation. Used for display-page hosts and thank-you pages.</td></tr>
+</table></div>
+
+<h2>What a Content Page really is</h2>
+<p>A tree of <b>page elements</b>. Every content page has exactly one <code>Root</code>; everything else nests inside it.</p>
+<div class="wrap"><table>
+	<tr><th>Element type</th><th>Role</th></tr>
+	<tr><td><code>Root</code></td><td>The top of the tree</td></tr>
+	<tr><td><code>Section</code></td><td>A layout band: columns, spacing, background</td></tr>
+	<tr><td><code>Row</code> / <code>ColumnDefinition</code></td><td>Grid structure inside a section</td></tr>
+	<tr><td><code>Fragment</code></td><td>A <a href="fragments.html">fragment</a> placement, by <code>key</code> + <code>siteKey</code></td></tr>
+	<tr><td><code>Widget</code></td><td>A portlet embedded in a content page</td></tr>
+	<tr><td><code>Collection</code></td><td>A <a href="collections.html">Collection Display</a>, bound via <code>collectionConfig</code></td></tr>
+	<tr><td><code>CollectionItem</code></td><td>The per-row template inside a Collection</td></tr>
+	<tr><td><code>DropZone</code></td><td>On a <a href="templates.html#master">master page</a>: where the page's own body is injected</td></tr>
+	<tr><td><code>Form</code></td><td>A <a href="forms.html">Form Container</a> bound to an object definition</td></tr>
+</table></div>
+<p>Minimum viable page definition:</p>
+<pre><code>{
+	"pageElement": { "pageElements": [], "type": "Root" },
+	"version": "1.0"
+}</code></pre>
+<p>Selecting a master and adding a fragment:</p>
+<pre><code>{
+	"pageElement": {
+		"pageElements": [
+			{
+				"definition": { "fragment": { "key": "home-hero", "siteKey": "[$GROUP_KEY$]" } },
+				"type": "Fragment"
+			}
+		],
+		"type": "Root"
+	},
+	"settings": { "masterPage": { "key": "badael-master" } },
+	"version": 1.1
+}</code></pre>
+
+<h2>Page metadata (<code>page.json</code>)</h2>
+<pre><code>{
+	"friendlyURL": "/home",
+	"hidden": false,
+	"name": "Home",
+	"name_i18n": { "en_US": "Home" },
+	"permissions": [ { "actionIds": ["VIEW"], "roleName": "Guest", "scope": 4 } ],
+	"private": false,
+	"type": "Content"
+}</code></pre>
+<p><code>scope: 4</code> is <code>SCOPE_INDIVIDUAL</code> &mdash; this page only. The <a href="permissions.html#scope">scope table</a> explains the other values, and why the wrong one silently grants nothing.</p>
+
+<h2>Navigation</h2>
+<p>Two independent things put links in a menu:</p>
+<ol>
+	<li><b>The page hierarchy.</b> The Classic theme's navbar renders non-hidden public pages on its own, whether or not you define a menu.</li>
+	<li><b>Navigation menus.</b> Explicit, ordered menus defined in <code>site-navigation-menus.json</code>, whose items are <code>layout</code>, <code>url</code>, <code>node</code>, or <code>display-page</code>.</li>
+</ol>
+<pre><code>[
+	{
+		"auto": false,
+		"externalReferenceCode": "BADAEL_MAIN_MENU",
+		"menuItems": [
+			{ "externalReferenceCode": "NAV_HOME", "friendlyURL": "/home", "privateLayout": false, "type": "layout" }
+		],
+		"name": "Main Menu",
+		"typeSite": 1
+	}
+]</code></pre>
+<div class="callout trap">
+	<b>A bad friendly URL is skipped, not reported</b>
+	<p>A <code>layout</code> menu item is resolved by <b>friendly URL</b>. No match logs <em>"No layout found with friendly URL /whatever"</em> and the item is dropped &mdash; the menu still provisions, just shorter. Count items over REST after provisioning rather than trusting the build.</p>
+</div>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="fragments.html">Fragments &mdash; the building blocks</a></li>
+	<li><a href="collections.html">Collections &mdash; lists on a page</a></li>
+	<li><a href="templates.html#master">Master pages &mdash; the chrome</a></li>
+	<li><a href="templates.html#pagetemplate">Page templates &mdash; the starting layout</a></li>
+	<li><a href="templates.html#display">Display pages &mdash; auto-generated per item</a></li>
+	<li><a href="theme-design.html">Style books &mdash; how it looks</a></li>
+	<li><a href="permissions.html">Permissions &mdash; who can see it</a></li>
+	<li><a href="personalization.html">Experiences &mdash; variants of the same page</a></li>
+	<li><a href="headless-apis.html">Headless APIs &mdash; creating pages programmatically</a></li>
+</ul>
+
+<h2>Creating pages via API</h2>
+<pre><code>POST /o/headless-admin-site/v1.0/sites/{siteExternalReferenceCode}/site-pages</code></pre>
+<div class="callout warn">
+	<b>ERC, not numeric ID</b>
+	<p><code>headless-admin-site</code> keys sites by <b>external reference code</b> in the path. A numeric site ID returns <b>404</b> &mdash; which reads as "the endpoint does not exist" and sends people hunting for a feature flag. (<code>headless-admin-content</code> and <code>headless-delivery</code>, confusingly, do use numeric <code>siteId</code>.)</p>
+</div>
+<div class="callout warn">
+	<b>Feature flags gate the page APIs</b>
+	<p><code>LPD-35443</code> for public layouts (off by default), <code>LPD-38869</code> for private (on), <code>LPD-39244</code> for fragment/page composition, <code>LPD-74328</code> for page-element creation (depends on <code>LPD-35443</code>). A 404 from a page endpoint usually means a flag, not a typo.</p>
+</div>
+
+<h2>Traps</h2>
+<div class="callout trap">
+	<b>Page composition changes need a full reprovision</b>
+	<p>Re-triggering a <a href="site-initializers.html">site initializer</a> upserts pages but does not retrofit composition changes onto pages that already exist. Editing <code>page-definition.json</code> for an existing page does nothing until the site is deleted and recreated.</p>
+</div>
+<div class="callout warn">
+	<b>Deleting the site does not delete your objects</b>
+	<p><a href="objects.html">Object</a> definitions and entries are company-scoped and survive site deletion &mdash; so reprovisioning is safe for runtime data. The exception is an object explicitly scoped to the site; those entries go with it.</p>
+</div>

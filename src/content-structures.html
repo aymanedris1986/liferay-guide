@@ -1,0 +1,79 @@
+<!--title: Content Structures-->
+<!--subtitle: The field definition behind a Web Content article. It decides what editors are asked for, and what templates, collections and display pages can reference.-->
+
+<h2>In one sentence</h2>
+<p>A <b>Content Structure</b> (older name: <em>DDM Structure</em>) is a form definition. It lists the fields a <a href="web-content.html">Web Content article</a> of that kind has, their types, whether they repeat, and whether they are required.</p>
+
+<h2>What it actually is</h2>
+<p>Think of it as a database table definition that a non-developer can build in a drag-and-drop form builder. Create a structure called <em>News Article</em> with fields <code>headline</code>, <code>summary</code>, <code>heroImage</code>, <code>body</code>, <code>publishDate</code>, and every news article now has exactly those slots.</p>
+<p>Structures do three jobs at once:</p>
+<ol>
+	<li><b>They shape the editor form.</b> Editors see your labels and field types, not a blank rich-text box.</li>
+	<li><b>They make content addressable.</b> A <a href="web-content-templates.html">template</a> can say "render <code>heroImage</code>"; a <a href="fragments.html">fragment</a> can map an editable element to <code>headline</code>.</li>
+	<li><b>They make content filterable.</b> A <a href="collections.html">dynamic collection</a> can select "all Web Content of structure <em>News Article</em>", and a <a href="templates.html#display">display page template</a> binds to one structure.</li>
+</ol>
+
+<h3>Field types you will actually use</h3>
+<div class="wrap"><table>
+	<tr><th>Type</th><th>Stores</th><th>Notes</th></tr>
+	<tr><td>Text</td><td>Single-line string</td><td>Index as <em>keyword</em> when you want to filter/sort on it</td></tr>
+	<tr><td>Text Box</td><td>Multi-line plain text</td><td>Summaries, alt text</td></tr>
+	<tr><td>Rich Text (HTML)</td><td>WYSIWYG markup</td><td>The article body; avoid for anything you need to style precisely</td></tr>
+	<tr><td>Image</td><td>Reference to a <a href="documents-media.html">Document</a></td><td>Stored as a reference, not a copy &mdash; replacing the document updates every article</td></tr>
+	<tr><td>Document &amp; Media</td><td>File reference</td><td>PDFs, attachments</td></tr>
+	<tr><td>Link to Page</td><td>Layout reference</td><td>Survives page renames; a raw text URL does not</td></tr>
+	<tr><td>Date / Number / Decimal / Boolean</td><td>Typed scalars</td><td>Typed values sort and filter correctly; a date in a Text field does not</td></tr>
+	<tr><td>Select / Radio / Checkbox</td><td>Enumerated choice</td><td>Options are defined in the structure itself</td></tr>
+	<tr><td>Geolocation, Color, Rich Content</td><td>Specialised</td><td>Rarely load-bearing</td></tr>
+</table></div>
+
+<h3>Repeatable fields and field sets</h3>
+<p>Any field can be marked <b>repeatable</b>, which turns it into a list the editor can add rows to. Group several fields into a <b>field set</b> and make the set repeatable to get a repeating record &mdash; for example a <em>Link</em> field set of <code>label</code> + <code>url</code>, repeated to build a nav block.</p>
+<div class="callout note">
+	<b>Repeatable vs an Object</b>
+	<p>Repeatable field sets are fine for a handful of rows that belong to <em>this one article</em>. The moment those rows need their own permissions, their own URLs, or to be queried independently, they are records &mdash; use an <a href="objects.html">Object</a> with a relationship instead.</p>
+</div>
+
+<h2>Structure vs Object &mdash; the honest comparison</h2>
+<div class="wrap"><table>
+	<tr><th></th><th>Content Structure</th><th><a href="objects.html">Object Definition</a></th></tr>
+	<tr><td>Built by</td><td>Content authors, in Site Admin</td><td>Admins/developers, in Control Panel or API</td></tr>
+	<tr><td>Versioning per record</td><td>Yes</td><td>No</td></tr>
+	<tr><td>Per-locale values</td><td>Yes, built in</td><td>Not per field</td></tr>
+	<tr><td>Relationships between records</td><td>No</td><td>Yes (one-to-many, many-to-many)</td></tr>
+	<tr><td>Validation rules</td><td>Required/regex only</td><td>Expression rules + <a href="client-extensions.html#objectvalidationrule">CET rules</a></td></tr>
+	<tr><td>Lifecycle actions on save</td><td>Via workflow only</td><td><a href="workflow.html#actions">Object actions</a> on create/update/delete</td></tr>
+	<tr><td>Queryable REST collection</td><td><code>/o/headless-delivery/…/structured-contents</code></td><td><code>/o/c/&lt;plural&gt;</code> with OData filters</td></tr>
+	<tr><td>Storage</td><td>XML blob of field values</td><td>Real database columns</td></tr>
+</table></div>
+<p>Short version: <b>structures are for editorial content, objects are for data</b>. If a human writes it and another human proofreads it, structure. If a system reads it and filters it, object.</p>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="web-content.html">Web Content &mdash; the articles that use it</a></li>
+	<li><a href="web-content-templates.html">Web Content Template &mdash; renders its fields</a></li>
+	<li><a href="collections.html">Collections &mdash; filter by structure</a></li>
+	<li><a href="templates.html#display">Display Page Template &mdash; bound per structure</a></li>
+	<li><a href="fragments.html#mapping">Fragments &mdash; map editables to its fields</a></li>
+	<li><a href="objects.html">Objects &mdash; the alternative</a></li>
+</ul>
+
+<h3>The pairing rule</h3>
+<p>A structure almost always ships with at least one template. Liferay lets a structure have several templates &mdash; a <em>card</em> template for <a href="collections.html">listings</a> and a <em>full</em> template for the <a href="templates.html#display">display page</a> is the standard pair.</p>
+<div class="ascii">                                ┌──▶ Template "News Card"  ──▶ used in the collection listing
+  Structure "News Article" ─────┤
+                                └──▶ Template "News Full"  ──▶ used on the display page</div>
+
+<h2>Traps</h2>
+<div class="callout trap">
+	<b>Field reference, not field label</b>
+	<p>Templates and fragment mappings bind to the field's <b>reference</b> (its stable key), not its display label. Renaming the label is safe; changing the reference silently breaks every template and mapping that used it, with no build error &mdash; the value simply renders empty.</p>
+</div>
+<div class="callout trap">
+	<b>Deleting a field deletes the data</b>
+	<p>Existing articles store values keyed by field reference in their XML. Remove the field from the structure and those values become unreachable. Treat structure changes on a live site as a data migration.</p>
+</div>
+<div class="callout warn">
+	<b>Indexing matters for collections</b>
+	<p><code>index-type="keyword"</code> makes a field filterable and sortable; <code>index-type="text"</code> makes it full-text searchable. A field indexed the wrong way will not be offered as a sort or filter option in a <a href="collections.html">dynamic collection</a>, and the cause is invisible in the UI.</p>
+</div>

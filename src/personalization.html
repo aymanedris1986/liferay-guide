@@ -1,0 +1,83 @@
+<!--title: Segments & experiences-->
+<!--subtitle: Showing different content to different people, on the same URL. Segments define who; experiences define what they see; A/B testing decides which wins.-->
+
+<h2>The three pieces</h2>
+<div class="ascii">  SEGMENT            "Managers"  ·  "Arabic speakers"  ·  "New joiners (< 90 days)"
+     │                  who the visitor is
+     ▼
+  EXPERIENCE         a whole alternative composition of ONE page, bound to a segment
+     │                  what they see
+     ▼
+  A/B TEST           two variants of an experience, measured against a goal
+                        which one performs better</div>
+
+<h2>Segments</h2>
+<p>A <b>segment</b> is a saved audience definition, evaluated per request. Criteria come from several sources:</p>
+<div class="wrap"><table>
+	<tr><th>Source</th><th>Examples</th></tr>
+	<tr><td>User attributes</td><td>Job title, organization, user group, role, email domain</td></tr>
+	<tr><td>Organization / account</td><td>Department, region, B2B account membership</td></tr>
+	<tr><td>Session</td><td>Locale, browser, device, referrer, signed-in state</td></tr>
+	<tr><td>Behaviour (with Analytics Cloud)</td><td>Pages viewed, content interacted with, campaign source</td></tr>
+	<tr><td>Custom fields</td><td>Anything you added to the user model</td></tr>
+</table></div>
+<p>Segments are reusable: define "Managers" once and use it for page experiences, <a href="permissions.html">personalised content</a>, and notification targeting.</p>
+<div class="callout note">
+	<b>Segment vs role &mdash; they are not the same thing</b>
+	<p>A <a href="permissions.html">role</a> answers "what may this person <em>do</em>" and is enforced by the security layer. A segment answers "what should this person <em>see</em>" and is a presentation concern. Never use a segment to hide sensitive content &mdash; the content is still served, just not shown. Use permissions for that.</p>
+</div>
+
+<h2>Experiences</h2>
+<p>An <b>experience</b> is a complete alternative composition of one <a href="pages.html">content page</a>, bound to a segment. Same URL, same page, different <a href="fragments.html">fragments</a>, different mapped content, different <a href="collections.html">collections</a>.</p>
+<div class="wrap"><table>
+	<tr><th>Property</th><th>Behaviour</th></tr>
+	<tr><td>Priority</td><td>Experiences are ordered; the first whose segment matches wins</td></tr>
+	<tr><td>Default</td><td>The last one, matching everybody. Always exists.</td></tr>
+	<tr><td>Scope</td><td>Per page. Not per site, not per fragment.</td></tr>
+	<tr><td>Editing</td><td>Each experience is edited independently in the page editor</td></tr>
+</table></div>
+<div class="callout warn">
+	<b>Experiences multiply your maintenance</b>
+	<p>Three experiences on a page means three compositions to update when the design changes. They do not inherit from the default. Use them where the difference is genuinely worth it &mdash; a different hero and CTA &mdash; not to vary a single word.</p>
+</div>
+
+<h3>Cheaper alternatives to a full experience</h3>
+<div class="wrap"><table>
+	<tr><th>Need</th><th>Cheaper option</th></tr>
+	<tr><td>One block differs by audience</td><td>A <a href="collections.html">collection</a> filtered by a <a href="taxonomy.html">category</a> the audience already implies</td></tr>
+	<tr><td>Language differences</td><td>Localisation, not segmentation &mdash; <a href="web-content.html">Web Content</a> is translatable per field</td></tr>
+	<tr><td>Signed-in vs signed-out</td><td>Page permissions plus a separate page, usually clearer</td></tr>
+	<tr><td>Department-specific news</td><td>One page, one collection, filtered by the user's department category</td></tr>
+</table></div>
+
+<h2>A/B testing</h2>
+<p>With Analytics Cloud connected, an A/B test runs two variants of an experience against a goal (clicks, bounce rate, conversion) and reports a winner, which you can then publish as the default.</p>
+<ul>
+	<li>Needs enough traffic to reach significance &mdash; on an intranet with 300 users, usually it does not.</li>
+	<li>Requires Analytics Cloud; without it you get experiences but no measurement.</li>
+	<li>Test one meaningful change at a time; two changes give you an unattributable result.</li>
+</ul>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="pages.html">Pages &mdash; experiences are per page</a></li>
+	<li><a href="fragments.html">Fragments &mdash; what varies</a></li>
+	<li><a href="collections.html">Collections &mdash; often the cheaper variation</a></li>
+	<li><a href="taxonomy.html">Categories &mdash; audience-aligned content filtering</a></li>
+	<li><a href="permissions.html">Permissions &mdash; for anything that must be hidden, not just unshown</a></li>
+	<li><a href="objects.html">Objects &mdash; user attributes segments read</a></li>
+</ul>
+
+<h2>Traps</h2>
+<div class="callout trap">
+	<b>Segmentation is not security</b>
+	<p>Content excluded by a segment is still on the server and still permitted. Anyone who can guess a URL or read an API response gets it. If it must not be seen, it needs a <a href="permissions.html">permission</a>.</p>
+</div>
+<div class="callout warn">
+	<b>Caching interacts with personalisation</b>
+	<p>Personalised pages cannot be cached as aggressively as static ones. A page with many experiences is a page you are serving fresh each time &mdash; worth knowing before applying it to the homepage.</p>
+</div>
+<div class="callout warn">
+	<b>Experiences are not carried by a site initializer's page upserts</b>
+	<p>Like any <a href="pages.html">page composition</a> change, adding an experience to an existing page needs a <a href="site-initializers.html#reprovision">reprovision</a> to come from source.</p>
+</div>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Content · Liferay Component Guide</title>
+<meta name="description" content="The editor-owned content type. A Web Content article is a set of filled-in fields, versioned, translatable, and approvable — it carries no layout of its own.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+	<strong><a href="index.html">Liferay Component Guide</a></strong>
+	<span>DXP 2026.Q2 &middot; what each piece is, and when to reach for it</span>
+</header>
+<div class="shell">
+	<nav class="sidebar" aria-label="Components">
+			<h4>Start here</h4>
+			<ul>
+				<li><a href="index.html">Overview & map</a></li>
+				<li><a href="decision-guide.html">What should I use?</a></li>
+			</ul>
+			<h4>Content</h4>
+			<ul>
+				<li><a aria-current="page" href="web-content.html">Web Content (articles)</a></li>
+				<li><a href="content-structures.html">Content Structures</a></li>
+				<li><a href="web-content-templates.html">Web Content Templates</a></li>
+				<li><a href="documents-media.html">Documents & Media</a></li>
+				<li><a href="taxonomy.html">Categories, Tags & Assets</a></li>
+			</ul>
+			<h4>Pages & layout</h4>
+			<ul>
+				<li><a href="pages.html">Pages & page types</a></li>
+				<li><a href="fragments.html">Fragments</a></li>
+				<li><a href="collections.html">Collections</a></li>
+				<li><a href="templates.html">All template types</a></li>
+				<li><a href="theme-design.html">Themes & style books</a></li>
+				<li><a href="personalization.html">Segments & experiences</a></li>
+			</ul>
+			<h4>Data & logic</h4>
+			<ul>
+				<li><a href="objects.html">Objects</a></li>
+				<li><a href="forms.html">Forms</a></li>
+				<li><a href="workflow.html">Workflow & notifications</a></li>
+				<li><a href="permissions.html">Roles & permissions</a></li>
+			</ul>
+			<h4>Extend & integrate</h4>
+			<ul>
+				<li><a href="client-extensions.html">Client extensions</a></li>
+				<li><a href="widgets-modules.html">Widgets & OSGi modules</a></li>
+				<li><a href="headless-apis.html">Headless APIs</a></li>
+				<li><a href="site-initializers.html">Site initializers</a></li>
+			</ul>
+	</nav>
+	<main id="main">
+		<h1>Web Content</h1>
+		<p class="lede">The editor-owned content type. A Web Content article is a set of filled-in fields, versioned, translatable, and approvable — it carries no layout of its own.</p>
+
+<h2>In one sentence</h2>
+<p>A <b>Web Content article</b> (internally a <em>Journal Article</em>) is one record of editorial content: a title plus values for the fields its <a href="content-structures.html">Content Structure</a> defines, rendered by a <a href="web-content-templates.html">Web Content Template</a> and placed on a <a href="pages.html">page</a>.</p>
+
+<h2>What it actually is</h2>
+<p>Three things are always involved, and confusing them is the #1 source of "why is my content blank":</p>
+<div class="ascii">  Content Structure  ──── defines what fields exist ────▶   "Title, Subtitle, Image, Body, Author"
+         ▲                                                             │
+         │ an article picks one structure                              │ filled in by an editor
+         │                                                             ▼
+  Web Content Article  ───────────────────────────────▶   the actual values for one news item
+         │
+         │ rendered by
+         ▼
+  Web Content Template  ──── FreeMarker markup ────▶   the HTML a visitor sees</div>
+<p>The structure is the <em>shape</em>. The article is the <em>data</em>. The template is the <em>look</em>. You can swap the template without touching a single article, and that is the whole point of the split.</p>
+
+<h3>Basic vs structured</h3>
+<div class="wrap"><table>
+	<tr><th>Kind</th><th>What it is</th><th>Use when</th></tr>
+	<tr><td><b>Basic Web Content</b></td><td>One rich-text body, no structure chosen</td><td>Free-form prose: an "About us" blurb, a legal notice. Editors get a WYSIWYG and nothing to fill in wrong.</td></tr>
+	<tr><td><b>Structured Web Content</b></td><td>Article bound to a <a href="content-structures.html">Content Structure</a></td><td>Anything repeated with consistent parts: news, press releases, staff profiles, product cards. Enables reliable <a href="collections.html">collections</a> and <a href="templates.html#display">display pages</a>.</td></tr>
+</table></div>
+<div class="callout note">
+	<b>Rule of thumb</b>
+	<p>If you will ever want to list these items, filter them, or give each one its own URL, it must be <b>structured</b>. Basic web content is a dead end for anything but a one-off block of prose.</p>
+</div>
+
+<h2>What you get for free</h2>
+<ul>
+	<li><b>Versioning</b> — every save creates a version (1.0, 1.1, …). Editors can compare and restore.</li>
+	<li><b>Translation</b> — per-locale values on each field, with a translation UI and a per-locale completion state.</li>
+	<li><b>Scheduling</b> — display date, expiration date, review date.</li>
+	<li><b>Workflow</b> — attach a <a href="workflow.html">Kaleo workflow</a> so articles need approval before going live.</li>
+	<li><b>Asset behaviour</b> — <a href="taxonomy.html">categories and tags</a>, related assets, ratings, comments, and search indexing come along automatically.</li>
+	<li><b>Folders</b> — for organisation and per-folder permissions/workflow.</li>
+</ul>
+<p>An <a href="objects.html">Object</a> gives you none of the first four. That is the real dividing line between the two.</p>
+
+<h2>When to use it</h2>
+<div class="wrap"><table>
+	<tr><th>Use Web Content for</th><th>Use something else for</th></tr>
+	<tr><td>News, announcements, blog-like posts</td><td>Records with relationships and status lifecycles &rarr; <a href="objects.html">Objects</a></td></tr>
+	<tr><td>Marketing copy that must be translated and approved</td><td>Form submissions from visitors &rarr; <a href="forms.html">Forms</a> on an Object</td></tr>
+	<tr><td>Reusable blocks shown in several places (one article, many pages)</td><td>Binary files &rarr; <a href="documents-media.html">Documents &amp; Media</a></td></tr>
+	<tr><td>Structured editorial items: staff profiles, FAQs, policies</td><td>Anything queried by a filter expression at scale &rarr; <a href="objects.html">Objects</a></td></tr>
+</table></div>
+
+<h2>How it connects to everything else</h2>
+<ul class="rel">
+	<li><a href="content-structures.html">Content Structure &mdash; defines its fields</a></li>
+	<li><a href="web-content-templates.html">Web Content Template &mdash; renders it</a></li>
+	<li><a href="collections.html">Collections &mdash; list many articles</a></li>
+	<li><a href="templates.html#display">Display Page Template &mdash; one URL per article</a></li>
+	<li><a href="fragments.html">Fragments &mdash; map article fields into page markup</a></li>
+	<li><a href="taxonomy.html">Categories &mdash; what collections filter on</a></li>
+	<li><a href="workflow.html">Workflow &mdash; approval before publish</a></li>
+	<li><a href="headless-apis.html">Headless APIs &mdash; create and read articles</a></li>
+</ul>
+
+<h3>The four ways an article reaches a visitor</h3>
+<div class="wrap"><table>
+	<tr><th>Path</th><th>How</th><th>Best for</th></tr>
+	<tr><td><b>Mapped into a fragment</b></td><td>Drop a fragment on a page, map its editable element to an article field</td><td>Designed layouts where the fragment controls the look</td></tr>
+	<tr><td><b>Web Content Display widget</b></td><td>Place the widget, pick the article, optionally pick a template</td><td>Quick placement, editor-selectable content</td></tr>
+	<tr><td><b>Through a collection</b></td><td>A <a href="collections.html">collection</a> of articles rendered by a Collection Display fragment</td><td>Index and listing pages</td></tr>
+	<tr><td><b>Its own display page</b></td><td>A <a href="templates.html#display">display page template</a> bound to the structure gives every article a URL</td><td>Detail pages, permalinks, SEO</td></tr>
+</table></div>
+
+<h2>In source control</h2>
+<p>A <a href="site-initializers.html">site initializer</a> carries articles as a pair of files under <code>journal-articles/</code>: a <code>.json</code> naming the structure and folder, and an <code>.xml</code> holding the field values.</p>
+<pre><code>journal-articles/leadership/leadership_profile_8.json
+{
+	"ddmStructureKey": "Leadership Profile",
+	"folder": "Leadership",
+	"name": "Nigel Cook"
+}</code></pre>
+<pre><code>journal-articles/leadership/leadership_profile_8.xml
+&lt;root available-locales="en_US" default-locale="en_US" version="1.0"&gt;
+	&lt;dynamic-element field-reference="name" index-type="keyword" name="name" type="text"&gt;
+		&lt;dynamic-content language-id="en_US"&gt;&lt;![CDATA[Nigel Cook]]&gt;&lt;/dynamic-content&gt;
+	&lt;/dynamic-element&gt;
+	&lt;dynamic-element field-reference="image" name="image" type="image"&gt;
+		&lt;dynamic-content language-id="en_US"&gt;
+			&lt;![CDATA[[$DOCUMENT_JSON:/site-initializer/documents/group/Leadership/leader.png$]]]&gt;
+		&lt;/dynamic-content&gt;
+	&lt;/dynamic-element&gt;
+&lt;/root&gt;</code></pre>
+<p>Note the <code>[$DOCUMENT_JSON:…$]</code> token: media references resolve at provisioning time, so the XML never hardcodes an ID. Same idea as every other <a href="site-initializers.html#tokens">initializer token</a>.</p>
+
+<h2>Traps</h2>
+<div class="callout trap">
+	<b>Changing a structure after articles exist</b>
+	<p>Removing or renaming a field on a live <a href="content-structures.html">structure</a> orphans the data already stored under that field reference in every article's XML. Add fields freely; removing them is a migration, not an edit.</p>
+</div>
+<div class="callout trap">
+	<b>Guest cannot read what you can</b>
+	<p>A logged-out visitor needs both a <a href="permissions.html#sap">Service Access Policy</a> (for Headless reads) and a VIEW grant. Your article looks fine to you and returns nothing to them. Verify with an unauthenticated <code>curl</code>, never with your own session.</p>
+</div>
+<div class="callout warn">
+	<b>Basic content in a structured slot</b>
+	<p>A <a href="collections.html">dynamic collection</a> filtered to a structure will silently skip basic articles &mdash; they have no structure, so they do not match. The list just comes back shorter than expected.</p>
+</div>
+		<footer class="pagefoot">
+			Part of the <a href="index.html">Liferay Component Guide</a>.
+			Not sure which component fits? Start at <a href="decision-guide.html">What should I use?</a>
+		</footer>
+	</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview & map · Liferay Component Guide</title>
+<meta name="description" content="Liferay is a small number of ideas wearing a lot of names. This guide explains each piece in plain English, shows how they connect, and tells you which one to reach for.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+	<strong><a href="index.html">Liferay Component Guide</a></strong>
+	<span>DXP 2026.Q2 &middot; what each piece is, and when to reach for it</span>
+</header>
+<div class="shell">
+	<nav class="sidebar" aria-label="Components">
+			<h4>Start here</h4>
+			<ul>
+				<li><a aria-current="page" href="index.html">Overview & map</a></li>
+				<li><a href="decision-guide.html">What should I use?</a></li>
+			</ul>
+			<h4>Content</h4>
+			<ul>
+				<li><a href="web-content.html">Web Content (articles)</a></li>
+				<li><a href="content-structures.html">Content Structures</a></li>
+				<li><a href="web-content-templates.html">Web Content Templates</a></li>
+				<li><a href="documents-media.html">Documents & Media</a></li>
+				<li><a href="taxonomy.html">Categories, Tags & Assets</a></li>
+			</ul>
+			<h4>Pages & layout</h4>
+			<ul>
+				<li><a href="pages.html">Pages & page types</a></li>
+				<li><a href="fragments.html">Fragments</a></li>
+				<li><a href="collections.html">Collections</a></li>
+				<li><a href="templates.html">All template types</a></li>
+				<li><a href="theme-design.html">Themes & style books</a></li>
+				<li><a href="personalization.html">Segments & experiences</a></li>
+			</ul>
+			<h4>Data & logic</h4>
+			<ul>
+				<li><a href="objects.html">Objects</a></li>
+				<li><a href="forms.html">Forms</a></li>
+				<li><a href="workflow.html">Workflow & notifications</a></li>
+				<li><a href="permissions.html">Roles & permissions</a></li>
+			</ul>
+			<h4>Extend & integrate</h4>
+			<ul>
+				<li><a href="client-extensions.html">Client extensions</a></li>
+				<li><a href="widgets-modules.html">Widgets & OSGi modules</a></li>
+				<li><a href="headless-apis.html">Headless APIs</a></li>
+				<li><a href="site-initializers.html">Site initializers</a></li>
+			</ul>
+	</nav>
+	<main id="main">
+		<h1>Overview & map</h1>
+		<p class="lede">Liferay is a small number of ideas wearing a lot of names. This guide explains each piece in plain English, shows how they connect, and tells you which one to reach for.</p>
+<p>Every page in this guide follows the same shape: <b>what it actually is</b>, <b>when to use it</b>, <b>when not to</b>, <b>how it connects to everything else</b>, and <b>the traps</b>. Links are inline, so you can follow a chain like <a href="objects.html">Object</a> &rarr; <a href="collections.html">Collection</a> &rarr; <a href="fragments.html">Fragment</a> &rarr; <a href="pages.html">Page</a> the way Liferay actually composes it.</p>
+
+<h2>The one-paragraph version</h2>
+<p>Liferay separates <b>where data lives</b> from <b>how it looks</b> from <b>where it appears</b>. Data lives in <a href="web-content.html">Web Content</a>, <a href="objects.html">Objects</a>, or <a href="documents-media.html">Documents</a>. Look is supplied by <a href="fragments.html">Fragments</a>, <a href="web-content-templates.html">templates</a>, and <a href="theme-design.html">style books</a>. Placement happens on <a href="pages.html">Pages</a>. <a href="collections.html">Collections</a> are the wire that carries "many items" from the data side to the look side. <a href="client-extensions.html">Client Extensions</a> are how you add your own code without touching the platform.</p>
+
+<h2>The mental model</h2>
+<div class="ascii">  DATA (what you store)            SHAPE (what a record looks like)     PLACEMENT (where it shows)
+  ─────────────────────            ────────────────────────────────     ──────────────────────────
+
+  Web Content article  ──needs──▶  Content Structure  (the fields)
+        │                                  │
+        │                                  └──rendered by──▶ Web Content Template (FreeMarker)
+        │
+  Object entry         ──defined by──▶  Object Definition (fields, relations)
+        │
+  Document             ──typed by──▶  Document Type + Metadata Set
+        │
+        │
+        └──── many of them ────▶  COLLECTION ────placed in────▶  Collection Display fragment
+                                  (manual or dynamic)                      │
+                                                                           ▼
+  one of them ────▶  DISPLAY PAGE TEMPLATE  ◀───── auto-generated URL per item
+                                                                           │
+                                                                           ▼
+                        FRAGMENTS  ──dropped onto──▶  CONTENT PAGE  ──wrapped by──▶  MASTER PAGE
+                                                          │                              │
+                                                          └── styled by ──▶  STYLE BOOK / themeCSS
+
+  Cross-cutting: ROLES &amp; PERMISSIONS gate every arrow.  HEADLESS APIs read/write every box.
+                 SITE INITIALIZER packages every box into version-controlled source.</div>
+
+<h2>Three vocabularies that trip everyone up</h2>
+<p>Liferay reuses three words for different things. Get these straight and half the confusion disappears:</p>
+<div class="wrap"><table>
+	<tr><th>Word</th><th>It can mean&hellip;</th><th>Disambiguated on</th></tr>
+	<tr>
+		<td><b>Template</b></td>
+		<td>A FreeMarker script that renders content fields; <em>or</em> a reusable page layout; <em>or</em> the per-item landing page; <em>or</em> a master header/footer; <em>or</em> an email body. Five unrelated things.</td>
+		<td><a href="templates.html">All template types</a></td>
+	</tr>
+	<tr>
+		<td><b>Collection</b></td>
+		<td>A saved list of items (Asset List); <em>or</em> the fragment that renders that list; <em>or</em> a <em>fragment collection</em>, which is just a folder of fragments and has nothing to do with the other two.</td>
+		<td><a href="collections.html">Collections</a></td>
+	</tr>
+	<tr>
+		<td><b>Structure</b></td>
+		<td>A Content Structure (fields for a web content article); <em>or</em> an Object definition (fields for a database record); <em>or</em> a Document Type / Metadata Set.</td>
+		<td><a href="content-structures.html">Content Structures</a> vs <a href="objects.html">Objects</a></td>
+	</tr>
+</table></div>
+
+<h2>Start where your question is</h2>
+<div class="cards">
+	<div class="card"><h3><a href="decision-guide.html">What should I use?</a></h3><p>Straight decision tables: "I need X" &rarr; use this, not that.</p></div>
+	<div class="card"><h3><a href="web-content.html">Web Content</a></h3><p>Editor-owned text and images, versioned and translatable.</p></div>
+	<div class="card"><h3><a href="objects.html">Objects</a></h3><p>Your own database tables with a REST API, no Java.</p></div>
+	<div class="card"><h3><a href="fragments.html">Fragments</a></h3><p>The HTML/CSS/JS building blocks editors drag onto pages.</p></div>
+	<div class="card"><h3><a href="collections.html">Collections</a></h3><p>How "show me a list of things" works.</p></div>
+	<div class="card"><h3><a href="templates.html">All template types</a></h3><p>The five different things called "template", side by side.</p></div>
+	<div class="card"><h3><a href="client-extensions.html">Client Extensions</a></h3><p>Every CET type with a real use case each.</p></div>
+	<div class="card"><h3><a href="pages.html">Pages</a></h3><p>Content pages, widget pages, masters, display pages.</p></div>
+	<div class="card"><h3><a href="permissions.html">Roles &amp; permissions</a></h3><p>Why your public page shows nothing to logged-out visitors.</p></div>
+</div>
+
+<h2>The four questions that pick your component</h2>
+<div class="wrap"><table>
+	<tr><th>Question</th><th>If yes</th><th>If no</th></tr>
+	<tr><td>Will a non-technical editor create and edit these records daily?</td><td><a href="web-content.html">Web Content</a> with a <a href="content-structures.html">structure</a></td><td><a href="objects.html">Object</a></td></tr>
+	<tr><td>Do records have relationships, a status lifecycle, or validation rules?</td><td><a href="objects.html">Object</a></td><td><a href="web-content.html">Web Content</a></td></tr>
+	<tr><td>Does it need to be <em>drag-and-droppable</em> onto a page by a marketer?</td><td><a href="fragments.html">Fragment</a></td><td><a href="client-extensions.html#customelement">Custom Element CET</a> or <a href="widgets-modules.html">widget</a></td></tr>
+	<tr><td>Does the code need to run server-side inside Liferay's JVM?</td><td><a href="widgets-modules.html">OSGi module</a> (last resort)</td><td><a href="client-extensions.html">Client Extension</a> (default)</td></tr>
+</table></div>
+
+<div class="callout note">
+	<b>About this guide</b>
+	<p>Written against <b>Liferay DXP 2026.Q2</b>, matching this workspace's <code>liferay.workspace.product=dxp-2026.q2.11</code>. Behaviour notes marked as traps are the ones that fail <em>silently</em> — the build succeeds, the page returns 200, and the defect shows up later.</p>
+</div>
+
+<h2>How to regenerate these pages</h2>
+<p>Page bodies live in <code>src/</code>; the shared shell (head, nav, footer) is applied by <code>build.sh</code>. Edit a body, then:</p>
+<pre><code>cd docs/liferay-guide
+bash build.sh</code></pre>
+<p>Adding a page means dropping <code>src/&lt;slug&gt;.html</code> (first two lines are <code>&lt;!--title: …--&gt;</code> and <code>&lt;!--subtitle: …--&gt;</code>) and adding one line to the <code>PAGES</code> array in <code>build.sh</code>.</p>
+		<footer class="pagefoot">
+			Part of the <a href="index.html">Liferay Component Guide</a>.
+			Not sure which component fits? Start at <a href="decision-guide.html">What should I use?</a>
+		</footer>
+	</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!--title: Headless APIs-->
+<!--subtitle: Every component in this guide has a REST surface. Here are the modules, their base URIs, the ID convention each one uses, and the feature flags that make endpoints appear to not exist.-->
+
+<h2>The modules</h2>
+<p>All paths resolve relative to <code>http://localhost:${PORT}</code>. Basic auth (<code>test@liferay.com:test</code>) works for local exploration and bypasses scope checks entirely, which is why a call that works in curl can still fail from a <a href="client-extensions.html">CET</a>.</p>
+<div class="wrap"><table>
+	<tr><th>Module</th><th>Base URI</th><th>Covers</th><th>OAuth scope</th></tr>
+	<tr><td>headless-admin-site</td><td><code>/o/headless-admin-site/v1.0</code></td><td><a href="pages.html">Pages</a>, navigation menus, display page templates, master pages, sites</td><td><code>Liferay.Headless.Admin.Site.everything</code></td></tr>
+	<tr><td>headless-admin-content</td><td><code>/o/headless-admin-content/v1.0</code></td><td><a href="web-content.html">Web content</a>, <a href="content-structures.html">structures</a>, style books, fragment collections</td><td><code>Liferay.Headless.Admin.Content.everything</code></td></tr>
+	<tr><td>headless-delivery</td><td><code>/o/headless-delivery/v1.0</code></td><td>Delivery-side content, blogs, <a href="documents-media.html">documents</a>, page contents</td><td><code>Liferay.Headless.Delivery.everything</code></td></tr>
+	<tr><td>object-admin</td><td><code>/o/object-admin/v1.0</code></td><td><a href="objects.html">Object definitions</a>, fields, relationships, actions, validations</td><td><code>Liferay.Object.Admin.REST.everything</code></td></tr>
+	<tr><td>object entries</td><td><code>/o/c/&lt;pluralLabel&gt;</code></td><td>Entries of a published object</td><td><code>Liferay.Headless.Object.everything</code></td></tr>
+	<tr><td>headless-admin-fragment</td><td><code>/o/headless-admin-fragment/v1.0</code></td><td><a href="fragments.html">Fragment</a> sets and fragments</td><td><code>Liferay.Headless.Admin.Fragment.everything</code></td></tr>
+	<tr><td>headless-admin-list-type</td><td><code>/o/headless-admin-list-type/v1.0</code></td><td><a href="objects.html#picklists">Picklists</a></td><td><code>Liferay.Headless.Admin.List.Type.everything</code></td></tr>
+	<tr><td>headless-admin-user</td><td><code>/o/headless-admin-user/v1.0</code></td><td>Users, accounts, <a href="permissions.html">roles</a>, organizations</td><td><code>Liferay.Headless.Admin.User.everything</code></td></tr>
+	<tr><td>headless-admin-workflow</td><td><code>/o/headless-admin-workflow/v1.0</code></td><td><a href="workflow.html">Workflow</a> definitions, instances, tasks</td><td><code>Liferay.Headless.Admin.Workflow.everything</code></td></tr>
+	<tr><td>batch-engine</td><td><code>/o/headless-batch-engine/v1.0</code></td><td>Bulk import/export</td><td><code>Liferay.Headless.Batch.Engine.everything</code></td></tr>
+</table></div>
+
+<div class="callout trap">
+	<b>ERC vs numeric ID &mdash; this costs everyone an hour</b>
+	<p><code>headless-admin-site</code> keys subresources by <b>external reference code</b>: <code>/sites/{siteExternalReferenceCode}/site-pages</code>. A numeric site ID returns <b>404</b>, which reads like "the endpoint does not exist" and sends you hunting a feature flag.</p>
+	<p><code>headless-admin-content</code> and <code>headless-delivery</code>, in the same product, use the <b>numeric</b> <code>{siteId}</code>.</p>
+</div>
+
+<h2>Common paths</h2>
+<pre><code># Pages — ERC in the path
+GET  /o/headless-admin-site/v1.0/sites/{siteERC}/site-pages
+POST /o/headless-admin-site/v1.0/sites/{siteERC}/site-pages
+POST /o/headless-admin-site/v1.0/sites/{siteERC}/navigation-menus
+POST /o/headless-admin-site/v1.0/sites/{siteERC}/display-page-templates
+
+# Web content — numeric siteId
+POST /o/headless-admin-content/v1.0/sites/{siteId}/structured-contents
+POST /o/headless-admin-content/v1.0/sites/{siteId}/content-structures
+
+# Objects — definitions then entries
+POST /o/object-admin/v1.0/object-definitions
+POST /o/object-admin/v1.0/object-definitions/{id}/object-fields
+POST /o/object-admin/v1.0/object-definitions/{id}/object-relationships
+POST /o/object-admin/v1.0/object-definitions/{id}/publish
+GET  /o/c/policies?filter=…&amp;sort=…&amp;page=1&amp;pageSize=20
+
+# Fragments — fragments are keyed by a generated ERC, not the fragment key
+GET  /o/headless-admin-fragment/v1.0/sites/{siteERC}/fragment-sets
+GET  /o/headless-admin-fragment/v1.0/sites/{siteERC}/fragment-sets/{setERC}/fragments</code></pre>
+
+<h2>Common parameters</h2>
+<div class="wrap"><table>
+	<tr><th>Parameter</th><th>Values</th></tr>
+	<tr><td><code>page</code> / <code>pageSize</code></td><td>1-based; default 20, max 200</td></tr>
+	<tr><td><code>filter</code></td><td>OData: <code>title eq 'Hello'</code>, <code>dateCreated gt 2026-01-01</code></td></tr>
+	<tr><td><code>sort</code></td><td><code>fieldName:asc</code> / <code>fieldName:desc</code></td></tr>
+	<tr><td><code>fields</code> / <code>restrictFields</code></td><td>Projection, to shrink the response</td></tr>
+	<tr><td><code>nestedFields</code></td><td>Expand related records inline &mdash; the relationship name</td></tr>
+</table></div>
+
+<h2>Error codes, and what they usually actually mean</h2>
+<div class="wrap"><table>
+	<tr><th>Status</th><th>Documented meaning</th><th>Most common real cause</th></tr>
+	<tr><td>400</td><td>Validation error</td><td>Read the <code>title</code> in the problem detail &mdash; it names the field</td></tr>
+	<tr><td>401</td><td>Not authenticated</td><td>The OAuth registration, not the scopes</td></tr>
+	<tr><td>403</td><td>Forbidden</td><td>Scope too narrow, or a missing <a href="permissions.html#sap">Service Access Policy</a> for anonymous calls</td></tr>
+	<tr><td>404</td><td>Not found</td><td>A <b>feature flag is off</b>, or you passed a numeric ID where an ERC was required</td></tr>
+	<tr><td>409</td><td>Conflict</td><td>Duplicate name or ERC</td></tr>
+	<tr><td>500</td><td>Server error</td><td>Check <code>bundles/logs/liferay.&lt;date&gt;.log</code></td></tr>
+	<tr><td><b>200 with an empty list</b></td><td>&mdash;</td><td>A <a href="permissions.html">permission</a> gap. This is the dangerous one.</td></tr>
+</table></div>
+
+<h2>Feature flags</h2>
+<p>Several APIs are gated. A flag that is off makes its endpoints return 404, which is indistinguishable from a wrong path.</p>
+<div class="wrap"><table>
+	<tr><th>Flag</th><th>Default</th><th>Unlocks</th><th>Depends on</th></tr>
+	<tr><td><code>LPD-35443</code></td><td>off</td><td>Public layout (page) REST API</td><td>&mdash;</td></tr>
+	<tr><td><code>LPD-38869</code></td><td>on</td><td>Private layout REST access</td><td>&mdash;</td></tr>
+	<tr><td><code>LPD-39244</code></td><td>off</td><td>Fragment / page composition REST API</td><td>&mdash;</td></tr>
+	<tr><td><code>LPD-74328</code></td><td>off</td><td>Page element / page specification create and update</td><td><code>LPD-35443</code></td></tr>
+	<tr><td><code>LPD-17564</code></td><td>off</td><td>Object collaborators (per-entry permissions)</td><td>&mdash;</td></tr>
+	<tr><td><code>LPD-52006</code></td><td>off</td><td>Object entry folders</td><td><code>LPD-17564</code></td></tr>
+	<tr><td><code>LPD-63311</code></td><td>off</td><td>MCP server at <code>/o/mcp/sse</code></td><td>&mdash;</td></tr>
+</table></div>
+<pre><code># in the active environment's portal-ext.properties
+feature.flag.LPD-35443=true</code></pre>
+<p>Most flags need a Tomcat bounce. Verify at <b>Control Panel &rarr; Instance Settings &rarr; Feature Flags</b> &mdash; the running portal is the only source of truth, since defaults change between quarterly releases.</p>
+
+<h2>Discovering endpoints</h2>
+<pre><code>GET /o/&lt;module&gt;/v1.0/openapi.json</code></pre>
+<p>The spec gives you exact paths and payload shapes. It does <b>not</b> tell you the base URI conventions, the feature-flag gates, or the OAuth scopes &mdash; those come from the table above.</p>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="objects.html">Objects &mdash; the generated entry API</a></li>
+	<li><a href="pages.html">Pages &mdash; creating layouts programmatically</a></li>
+	<li><a href="client-extensions.html">CETs &mdash; what calls these, and with which token</a></li>
+	<li><a href="permissions.html#sap">Service Access Policies &mdash; the gate before permissions</a></li>
+	<li><a href="site-initializers.html">Site initializers &mdash; the declarative alternative</a></li>
+	<li><a href="fragments.html">Fragments &mdash; browser-side calls run as the visitor</a></li>
+</ul>
+
+<h2>Traps</h2>
+<div class="callout trap">
+	<b>Editing a fragment over the API does not change any page using it</b>
+	<p>Liferay copies fragment code into each page's fragment instance. A <code>PUT</code> updates the library entry and leaves every existing placement untouched. <a href="site-initializers.html#reprovision">Reprovision</a> to apply fragment changes.</p>
+</div>
+<div class="callout warn">
+	<b>Basic auth hides scope problems</b>
+	<p>Your curl as <code>test@liferay.com</code> has full admin rights and evaluates no scopes. The same call from a CET with a narrow token returns 403. Test the CET path before declaring it works.</p>
+</div>
+<div class="callout warn">
+	<b>One section fragment breaks the fragment listing</b>
+	<p>A single fragment declaring <code>"type": "section"</code> makes the whole set's listing return <b>400</b>. Verified on 2026.Q2.</p>
+</div>

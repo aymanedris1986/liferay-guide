@@ -1,0 +1,138 @@
+<!--title: Collections-->
+<!--subtitle: The wire that carries "many items" from your data to your page. Three different things are called a collection — this page separates them and shows how each is wired.-->
+
+<h2>Three things named "collection"</h2>
+<div class="wrap"><table>
+	<tr><th>Name</th><th>What it is</th><th>Where you meet it</th></tr>
+	<tr><td><b>Collection</b> (Asset List)</td><td>A saved, reusable <em>list of items</em> &mdash; manual or dynamic</td><td>Site Admin &rarr; Content &rarr; Collections</td></tr>
+	<tr><td><b>Collection Display</b></td><td>The <em>fragment</em> that renders a collection on a page</td><td>Page editor sidebar</td></tr>
+	<tr><td><b>Fragment collection</b></td><td>Just a <em>folder</em> of <a href="fragments.html">fragments</a>. Unrelated to the other two.</td><td>Site Admin &rarr; Design &rarr; Fragments</td></tr>
+</table></div>
+<p>The rest of this page means the first two. The third is covered under <a href="fragments.html#sets">Fragments</a>.</p>
+
+<h2>The wiring</h2>
+<div class="ascii">  YOUR DATA                       THE LIST                       THE RENDERING
+  ─────────                       ────────                       ─────────────
+
+  Web Content articles ──┐
+  Object entries ────────┼──▶  COLLECTION  ──▶  Collection Display fragment  ──▶  page
+  Documents ─────────────┤     (manual or            │
+  Blog posts ────────────┘      dynamic)             ├── how many, how many columns, paging
+                                     ▲               ├── which fragments render each item
+                                     │               └── optional Collection Filter fragments
+                                     │
+                          Collection Provider
+                          (custom code supplying items)</div>
+
+<h2 id="manual">Manual vs dynamic</h2>
+<div class="wrap"><table>
+	<tr><th></th><th>Manual collection</th><th>Dynamic collection</th></tr>
+	<tr><td>Contents</td><td>Items an editor picked, in an order they chose</td><td>A saved query &mdash; items are matched at render time</td></tr>
+	<tr><td>Changes when new content is added</td><td>No</td><td>Yes, automatically</td></tr>
+	<tr><td>Filters on</td><td>n/a</td><td>Asset type, <a href="content-structures.html">structure/subtype</a>, <a href="taxonomy.html">categories and tags</a>, site scope</td></tr>
+	<tr><td>Sorting</td><td>Drag order</td><td>Publish date, title, modified date, relevance</td></tr>
+	<tr><td>Use for</td><td>"Featured this month", curated homepage rails</td><td>"Latest 6 news", "all policies tagged HR"</td></tr>
+</table></div>
+<div class="callout note">
+	<b>Both are reusable</b>
+	<p>A collection is a site-level entity, not a page setting. Define "Latest News" once and place it on the homepage, the news index, and a sidebar &mdash; three placements, one definition, one place to change the rules.</p>
+</div>
+
+<h2>Collection Display &mdash; what you configure</h2>
+<div class="wrap"><table>
+	<tr><th>Setting</th><th>Effect</th></tr>
+	<tr><td><code>numberOfItems</code></td><td>How many to show (and whether to cap at the collection's own limit)</td></tr>
+	<tr><td><code>numberOfColumns</code></td><td>Grid width</td></tr>
+	<tr><td><code>paginationType</code></td><td>None, numeric, or "load more"</td></tr>
+	<tr><td>Display &mdash; item template</td><td>Either a <a href="web-content-templates.html">Web Content Template</a>, or fragments you compose per item</td></tr>
+	<tr><td>List style</td><td>Grid, list, or a fragment-based layout</td></tr>
+</table></div>
+
+<h3>The per-item template</h3>
+<p>Inside a Collection Display you compose the <b>Collection Item</b>: the fragments rendered once per record. Their editable elements are mapped to the current item's fields rather than to a fixed article. In a <a href="site-initializers.html">page definition</a> that looks like:</p>
+<pre><code>{
+	"definition": {
+		"collectionConfig": {
+			"collectionType": "CollectionProvider",
+			"collectionReference": { "className": "[$OBJECT_DEFINITION_CLASS_NAME:Policy$]" }
+		},
+		"numberOfItems": 6,
+		"numberOfColumns": 3,
+		"paginationType": "numeric"
+	},
+	"type": "Collection",
+	"pageElements": [
+		{
+			"definition": { "collectionItemConfig": {} },
+			"type": "CollectionItem",
+			"pageElements": [
+				{
+					"definition": {
+						"fragment": { "key": "policy-card", "siteKey": "[$GROUP_KEY$]" },
+						"fragmentFields": [
+							{
+								"id": "card-title",
+								"value": { "text": { "mapping": { "fieldKey": "ObjectField_title", "itemReference": { "contextSource": "CollectionItem" } } } }
+							}
+						]
+					},
+					"type": "Fragment"
+				}
+			]
+		}
+	]
+}</code></pre>
+<p>Two details do the real work: <code>fieldKey</code> is <code>ObjectField_&lt;name&gt;</code> for an <a href="objects.html">Object</a> field, and <code>contextSource: "CollectionItem"</code> is what makes the mapping resolve per row instead of per page.</p>
+
+<h2>Collection filters</h2>
+<p>Drop <b>Collection Filter</b> fragments above a Collection Display and visitors can narrow it themselves &mdash; by category, tag, or a custom filter. The filter fragment must sit on the same page and targets the display by ID.</p>
+<p>For a bespoke filter UI, an <a href="client-extensions.html#fdsfilter"><code>fdsFilter</code> CET</a> covers Frontend Data Set tables; for collections, a custom filter fragment plus query params is the usual route.</p>
+
+<h2 id="providers">Collection providers</h2>
+<p>When neither a manual list nor a query expresses what you need &mdash; "the 5 policies this user has not acknowledged", "items from an external API" &mdash; a <b>Collection Provider</b> supplies items programmatically. It appears in the collection picker like any other collection.</p>
+<div class="wrap"><table>
+	<tr><th>Source</th><th>How</th><th>Notes</th></tr>
+	<tr><td>Liferay Object</td><td>Built in &mdash; every published <a href="objects.html">object</a> is offered as a collection provider</td><td>No code. This is the common case.</td></tr>
+	<tr><td>Custom logic</td><td><code>InfoCollectionProvider</code> in an <a href="widgets-modules.html">OSGi module</a></td><td>Self-hosted only; needs a deploy</td></tr>
+	<tr><td>External data</td><td>An <a href="client-extensions.html#objectentrymanager">Object Entry Manager CET</a> behind an object</td><td>Preferred &mdash; the object then works as a normal collection source</td></tr>
+</table></div>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="web-content.html">Web Content &mdash; a source of items</a></li>
+	<li><a href="objects.html">Objects &mdash; a source of items</a></li>
+	<li><a href="documents-media.html">Documents &mdash; a source of items</a></li>
+	<li><a href="taxonomy.html">Categories &mdash; what dynamic collections filter on</a></li>
+	<li><a href="fragments.html">Fragments &mdash; render each item</a></li>
+	<li><a href="pages.html">Pages &mdash; where the display lives</a></li>
+	<li><a href="templates.html#display">Display Page Templates &mdash; where each item links to</a></li>
+	<li><a href="permissions.html#guest">Permissions &mdash; why the list can render empty</a></li>
+</ul>
+
+<h3>The canonical index + detail pattern</h3>
+<div class="ascii">  /news              ──▶  Content page
+                          └── Collection Display  ──▶  dynamic collection "News"
+                                └── Collection Item ──▶ news-card fragment (title, image, date)
+                                      │
+                                      └── each card links to…
+  /news/my-article   ──▶  Display Page Template bound to the News structure
+                          └── fragments mapped to the current item</div>
+<p>Build these two things and you have an entire content section. Everything else is styling.</p>
+
+<h2>Traps</h2>
+<div class="callout trap" id="empty">
+	<b>The list renders empty for visitors and full for you</b>
+	<p>A Collection Display evaluates <b>item permissions as the visiting user</b>. For <a href="objects.html">object</a> entries, Guest has no VIEW until you grant it at company scope in <code>resource-permissions.json</code> (<code>"scope": "1"</code>). Page-level VIEW does not confer entry-level VIEW. Nothing is logged; the grid is just blank. See <a href="permissions.html#guest">Guest access</a>.</p>
+</div>
+<div class="callout trap">
+	<b>Wrong grant scope grants nothing</b>
+	<p><code>"scope": "3"</code> only sets defaults for <em>future</em> entries. Several Liferay-internal initializers use it, so it gets copied. Existing entries stay invisible and the handler reports success.</p>
+</div>
+<div class="callout warn">
+	<b>Page composition changes need a reprovision</b>
+	<p>Adding or rearranging a Collection Display on an <em>existing</em> page is not picked up by re-triggering a <a href="site-initializers.html">site initializer</a>. Pages are upserted, compositions are not retrofitted &mdash; delete the site and redeploy.</p>
+</div>
+<div class="callout warn">
+	<b>Do not compute totals in the browser on public pages</b>
+	<p>A fetch that returns 500 rows for you returns 0 for Guest, with HTTP 200. "500 of 500 seats taken" becomes "0 of 500" &mdash; confidently wrong rather than broken. Denormalize with an <a href="objects.html#aggregation">Aggregation field</a>.</p>
+</div>

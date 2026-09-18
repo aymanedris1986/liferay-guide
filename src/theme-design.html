@@ -1,0 +1,114 @@
+<!--title: Themes & style books-->
+<!--subtitle: Four layers control how a site looks, and they apply at different scopes with different lifecycles. Choosing the wrong layer is why brand changes keep getting lost.-->
+
+<h2>The four layers</h2>
+<div class="wrap"><table>
+	<tr><th>Layer</th><th>Controls</th><th>Scope</th><th>Survives a site reprovision?</th></tr>
+	<tr><td><a href="#stylebook">Style book</a></td><td>Design tokens: colours, fonts, spacing, border radius</td><td>Site (or per page)</td><td><b>Yes</b> &mdash; if it is in the initializer tree</td></tr>
+	<tr><td><a href="#themecss">themeCSS CET</a></td><td>Clay/Bootstrap variable overrides, full CSS</td><td>Whatever it is applied to</td><td><b>No</b> &mdash; the selection is manual</td></tr>
+	<tr><td><a href="client-extensions.html#globalcss">globalCSS CET</a></td><td>Arbitrary CSS everywhere, including admin</td><td>Instance</td><td>Yes (it is not site-scoped at all)</td></tr>
+	<tr><td>Fragment CSS</td><td>One component's styles</td><td>Wherever the <a href="fragments.html">fragment</a> is placed</td><td>Yes</td></tr>
+</table></div>
+<p>Plus <a href="templates.html#master">master pages</a>, which control <em>structure</em> rather than style, and <code>layout-set</code> settings, which switch the stock theme chrome on and off.</p>
+
+<h2 id="stylebook">Style books</h2>
+<p>A style book is a named set of <b>frontend token</b> values. The theme declares which tokens exist (a <em>frontend token definition</em>); the style book sets them; every page using that style book picks up the values without a deploy.</p>
+<pre><code>style-books/badael-brand/style-book.json
+{
+	"defaultStyleBookEntry": true,
+	"frontendTokensValues": {
+		"brandColor1": { "value": "#0b5fff" },
+		"fontFamily1": { "value": "Tajawal, sans-serif" },
+		"borderRadius": { "value": "8px" }
+	},
+	"name": "Badael Brand"
+}</code></pre>
+<div class="callout good">
+	<b>Prefer style books for anything a designer will change</b>
+	<p>No deploy, no restart, editable in the UI, versionable in the tree, and it survives reprovisioning. It is the cheapest rung on the <a href="decision-guide.html">cost ladder</a> for appearance.</p>
+</div>
+<p>Use the tokens in <a href="fragments.html">fragment</a> CSS through the CSS custom properties they generate, so a token change restyles your fragments too:</p>
+<pre><code>.badael-hero {
+	background: var(--brand-color-1);
+	border-radius: var(--border-radius);
+	font-family: var(--font-family-1);
+}</code></pre>
+
+<h2 id="themecss">themeCSS client extensions</h2>
+<p>The modern replacement for the legacy theme WAR. It ships compiled CSS &mdash; typically Clay variable overrides &mdash; and appears in the theme picker.</p>
+<pre><code>assemble:
+    - from: build/buildTheme/css
+      into: static
+
+badael-home-theme-css:
+    clayRTLURL: css/clay_rtl.css
+    clayURL: css/clay.css
+    mainRTLURL: css/main_rtl.css
+    mainURL: css/main.css
+    name: Badael Home Theme CSS
+    type: themeCSS</code></pre>
+<p>The RTL URLs matter for Arabic-language sites: Liferay serves the RTL sheet when the locale direction is right-to-left, and omitting them means an LTR layout under Arabic.</p>
+
+<div class="callout trap" id="trap">
+	<b>A themeCSS CET cannot be selected from the initializer tree</b>
+	<p>Liferay attaches a theme through a <code>ClientExtensionEntryRel</code> on the layout, master layout, or layout set. <code>BundleSiteInitializer</code> has <b>no handler</b> that creates that relation, and there is no key in <code>metadata.json</code> for it either.</p>
+	<p>So a deployed themeCSS CET is <em>available</em> but not <em>applied</em> until someone picks it in <b>Site Administration &rarr; Design &rarr; Theme</b> &mdash; and that selection is lost on <b>every reprovision</b>.</p>
+	<p><b>Plan accordingly.</b> Appearance that must survive delete-and-redeploy has to come from things the tree can express: a style book with <code>defaultStyleBookEntry: true</code>, the <a href="templates.html#master">master page</a>, fragment CSS, and layout-set settings. Reach for themeCSS for Clay-level overrides that have no token &mdash; Classic exposes no <code>headings*</code> tokens, for instance &mdash; and say plainly that applying it needs a manual step.</p>
+</div>
+
+<h2>Layout set settings</h2>
+<p>Switching off stock theme chrome so your master page's header and footer do not render <em>underneath</em> the theme's:</p>
+<pre><code>layout-set/public/metadata.json
+{
+	"colorSchemeId": "01",
+	"settings": {
+		"lfr-theme:regular:show-footer": false,
+		"lfr-theme:regular:show-header": false,
+		"lfr-theme:regular:show-header-search": false
+	},
+	"themeId": "classic_WAR_classictheme"
+}</code></pre>
+<div class="callout note">
+	<b>Prefer this over CSS hiding</b>
+	<p>Hiding <code>#banner</code> / <code>#footer</code> with a <a href="client-extensions.html#globalcss">globalCSS</a> rule is instance-wide, and there is no site-specific <code>body</code> class to scope it to &mdash; so you would hide the chrome on every other site too. The setting is scoped to this layout set.</p>
+</div>
+
+<h2>Legacy themes (WAR)</h2>
+<p>The old <code>themes/</code> directory with FreeMarker templates (<code>portal_normal.ftl</code>), SCSS, and theme settings. Still supported, but:</p>
+<div class="wrap"><table>
+	<tr><th>Legacy theme WAR</th><th>Modern equivalent</th></tr>
+	<tr><td><code>portal_normal.ftl</code> header/footer markup</td><td><a href="templates.html#master">Master page template</a> + <a href="fragments.html">fragments</a></td></tr>
+	<tr><td>SCSS variables</td><td><a href="#stylebook">Style book tokens</a></td></tr>
+	<tr><td>Theme CSS</td><td><a href="#themecss">themeCSS CET</a></td></tr>
+	<tr><td>Theme settings</td><td>Style book + layout-set settings</td></tr>
+	<tr><td>Theme JS</td><td><a href="client-extensions.html#globaljs">globalJS CET</a></td></tr>
+</table></div>
+<p>Do not start a new project on a theme WAR. It blocks SaaS and makes every upgrade a re-test.</p>
+
+<h2>Accessibility &mdash; check these while you still can change them</h2>
+<ul>
+	<li>Brand colour against its background must reach <b>4.5:1</b> for body text, 3:1 for large text. Check the token, not the screenshot.</li>
+	<li>Do not encode meaning in colour alone &mdash; a red "rejected" pill needs the word too.</li>
+	<li>Keep focus outlines. Removing them in fragment CSS is the most common accessibility regression in Liferay projects.</li>
+	<li>Heading levels follow document order; expose the level as a <a href="fragments.html">fragment configuration</a> so editors can fix it without a deploy.</li>
+	<li>For Arabic, verify the RTL sheet actually loads &mdash; mirrored paddings and icons are what break first.</li>
+</ul>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="fragments.html">Fragments &mdash; consume the tokens</a></li>
+	<li><a href="templates.html#master">Master pages &mdash; structure, not style</a></li>
+	<li><a href="pages.html">Pages &mdash; style books apply per page too</a></li>
+	<li><a href="client-extensions.html">Client extensions &mdash; themeCSS, globalCSS, spritemap, favicon</a></li>
+	<li><a href="site-initializers.html">Site initializers &mdash; what survives a reprovision</a></li>
+</ul>
+
+<h2>Traps</h2>
+<div class="callout warn">
+	<b>A frontend project cannot live in the initializer project</b>
+	<p><code>themeCSS</code> is classified <code>frontend</code>; <code>siteInitializer</code> is <code>batch</code>. The workspace plugin forbids the combination. Sibling projects &mdash; see <a href="client-extensions.html#grouping">grouping rules</a>.</p>
+</div>
+<div class="callout warn">
+	<b>A flat handler timing does not mean it failed</b>
+	<p>Adding <code>layout-set/public/metadata.json</code> leaves <code>updateLayoutSets</code> at <code>1 ms</code> in the log even when the settings plainly took effect. For single-file handlers, assert the outcome &mdash; fetch the page and confirm the chrome is gone &mdash; rather than reading the timing.</p>
+</div>

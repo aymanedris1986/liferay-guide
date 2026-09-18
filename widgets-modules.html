@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widgets & OSGi modules · Liferay Component Guide</title>
+<meta name="description" content="The classic extension model. Still supported, occasionally necessary, and the wrong default on a modern project — here is how to tell which case you are in.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+	<strong><a href="index.html">Liferay Component Guide</a></strong>
+	<span>DXP 2026.Q2 &middot; what each piece is, and when to reach for it</span>
+</header>
+<div class="shell">
+	<nav class="sidebar" aria-label="Components">
+			<h4>Start here</h4>
+			<ul>
+				<li><a href="index.html">Overview & map</a></li>
+				<li><a href="decision-guide.html">What should I use?</a></li>
+			</ul>
+			<h4>Content</h4>
+			<ul>
+				<li><a href="web-content.html">Web Content (articles)</a></li>
+				<li><a href="content-structures.html">Content Structures</a></li>
+				<li><a href="web-content-templates.html">Web Content Templates</a></li>
+				<li><a href="documents-media.html">Documents & Media</a></li>
+				<li><a href="taxonomy.html">Categories, Tags & Assets</a></li>
+			</ul>
+			<h4>Pages & layout</h4>
+			<ul>
+				<li><a href="pages.html">Pages & page types</a></li>
+				<li><a href="fragments.html">Fragments</a></li>
+				<li><a href="collections.html">Collections</a></li>
+				<li><a href="templates.html">All template types</a></li>
+				<li><a href="theme-design.html">Themes & style books</a></li>
+				<li><a href="personalization.html">Segments & experiences</a></li>
+			</ul>
+			<h4>Data & logic</h4>
+			<ul>
+				<li><a href="objects.html">Objects</a></li>
+				<li><a href="forms.html">Forms</a></li>
+				<li><a href="workflow.html">Workflow & notifications</a></li>
+				<li><a href="permissions.html">Roles & permissions</a></li>
+			</ul>
+			<h4>Extend & integrate</h4>
+			<ul>
+				<li><a href="client-extensions.html">Client extensions</a></li>
+				<li><a aria-current="page" href="widgets-modules.html">Widgets & OSGi modules</a></li>
+				<li><a href="headless-apis.html">Headless APIs</a></li>
+				<li><a href="site-initializers.html">Site initializers</a></li>
+			</ul>
+	</nav>
+	<main id="main">
+		<h1>Widgets & OSGi modules</h1>
+		<p class="lede">The classic extension model. Still supported, occasionally necessary, and the wrong default on a modern project — here is how to tell which case you are in.</p>
+
+<h2>The vocabulary</h2>
+<div class="wrap"><table>
+	<tr><th>Term</th><th>Means</th></tr>
+	<tr><td><b>Portlet</b></td><td>The Java standard for a self-contained web component with its own request lifecycle</td></tr>
+	<tr><td><b>Widget</b></td><td>What Liferay calls a portlet in the UI &mdash; the things in the "Add" sidebar</td></tr>
+	<tr><td><b>OSGi module</b></td><td>A JAR deployed <em>into</em> Liferay's JVM. May contain portlets, services, overrides, listeners</td></tr>
+	<tr><td><b>Service Builder</b></td><td>Liferay's code generator for persistence layers in a module</td></tr>
+	<tr><td><b>WAR</b></td><td>The older packaging; themes and some legacy apps</td></tr>
+</table></div>
+
+<h2>Built-in widgets you will actually use</h2>
+<p>You do not have to write these &mdash; they ship with the platform and can be placed on <a href="pages.html">pages</a>:</p>
+<div class="wrap"><table>
+	<tr><th>Widget</th><th>Does</th><th>Modern alternative</th></tr>
+	<tr><td>Web Content Display</td><td>Shows one <a href="web-content.html">article</a>, optionally with a chosen <a href="web-content-templates.html">template</a></td><td>A mapped <a href="fragments.html">fragment</a></td></tr>
+	<tr><td>Asset Publisher</td><td>Queries and lists assets with filters and an <a href="templates.html#adt">ADT</a></td><td><a href="collections.html">Collection Display</a></td></tr>
+	<tr><td>Documents and Media</td><td>Browsable file explorer</td><td>A collection of documents, for read-only listings</td></tr>
+	<tr><td>Navigation Menu / Breadcrumb / Site Map</td><td>Navigation</td><td>Still these, or a custom fragment</td></tr>
+	<tr><td>Search Bar + Search Results</td><td>Site search with facets</td><td>Still these</td></tr>
+	<tr><td>Language Selector, Sign In, User Personal Bar</td><td>Chrome</td><td>Still these, usually on a <a href="templates.html#master">master page</a></td></tr>
+	<tr><td>Object admin widget</td><td>CRUD UI for an <a href="objects.html">Object</a></td><td>Generated automatically</td></tr>
+	<tr><td>Message Boards, Blogs, Wiki, Calendar</td><td>Collaboration apps</td><td>Still these</td></tr>
+</table></div>
+<div class="callout note">
+	<b>Search is the one you should not rebuild</b>
+	<p>Search Bar + Search Results with facets is a large amount of functionality for zero code. Wire it to <a href="taxonomy.html">vocabularies</a> for facets and style it with CSS before considering anything custom.</p>
+</div>
+
+<h2>When a custom OSGi module is genuinely required</h2>
+<div class="wrap"><table>
+	<tr><th>Requirement</th><th>Why a CET cannot do it</th></tr>
+	<tr><td>A custom <a href="collections.html#providers">InfoCollectionProvider</a></td><td>The interface is registered in the OSGi registry; there is no CET equivalent</td></tr>
+	<tr><td>A custom indexer or search post-processor</td><td>Runs inside the search pipeline</td></tr>
+	<tr><td>A Model Listener reacting to core entities (User, Layout)</td><td>Only <a href="objects.html">Objects</a> expose lifecycle hooks to CETs</td></tr>
+	<tr><td>Overriding a Liferay service implementation</td><td>Requires being in the same OSGi registry</td></tr>
+	<tr><td>A custom authentication or auto-login verifier</td><td>Part of the request pipeline</td></tr>
+	<tr><td>Service Builder persistence for complex Java domain logic</td><td>Objects cover most of this; genuinely complex domains occasionally do not</td></tr>
+	<tr><td>A custom portlet with server-side render lifecycle</td><td>Custom Elements render client-side</td></tr>
+</table></div>
+
+<h2>The real cost</h2>
+<div class="wrap"><table>
+	<tr><th></th><th><a href="client-extensions.html">Client Extension</a></th><th>OSGi module</th></tr>
+	<tr><td>Runs</td><td>Outside the JVM (or just in the browser)</td><td>Inside Liferay's JVM</td></tr>
+	<tr><td>Works on SaaS</td><td>Yes</td><td><b>No</b></td></tr>
+	<tr><td>Upgrade impact</td><td>Minimal &mdash; it talks to versioned REST APIs</td><td>Re-compile and re-test against each release</td></tr>
+	<tr><td>A bug can take down the portal</td><td>No</td><td><b>Yes</b> &mdash; same heap, same threads</td></tr>
+	<tr><td>Language</td><td>Anything</td><td>Java</td></tr>
+	<tr><td>Deploy cadence</td><td>Independent</td><td>Coupled to the portal</td></tr>
+	<tr><td>Local build</td><td><code>blade gw deploy</code></td><td><code>blade gw deploy</code> + bundle restart in many cases</td></tr>
+</table></div>
+<div class="callout warn">
+	<b>The decision is mostly about SaaS and upgrades</b>
+	<p>One OSGi module in the estate means the whole system is self-hosted and every quarterly release is a regression cycle. That is sometimes the right call. It should never be an accidental one.</p>
+</div>
+
+<h2>Workspace layout</h2>
+<div class="ascii">modules/            OSGi modules and WARs   (liferay.workspace.modules.dir)
+themes/             legacy theme WARs       (liferay.workspace.themes.dir)
+client-extensions/  CETs                    ← start here
+configs/            per-environment properties: common, local, dev, uat, prod, docker
+bundles/            the Tomcat install + deployed artifacts (not in git)</div>
+<pre><code>blade gw deploy                       # build and deploy the current project
+blade gw tasks                        # what is available
+blade server start --tail             # start Tomcat and follow the log</code></pre>
+<p>Deployed artifacts land in <code>bundles/osgi/modules</code> and <code>bundles/osgi/client-extensions</code>; logs in <code>bundles/tomcat*/logs/catalina.out</code> and <code>bundles/logs/liferay.&lt;date&gt;.log</code>.</p>
+<div class="callout warn">
+	<b>Success is <code>STARTED</code> in the log, not a green build</b>
+	<p>A module can build, deploy, and sit in <code>INSTALLED</code> or <code>RESOLVED</code> forever because of an unsatisfied dependency, with no error on the console you were watching.</p>
+</div>
+
+<h2>How it connects</h2>
+<ul class="rel">
+	<li><a href="client-extensions.html">Client extensions &mdash; the default choice</a></li>
+	<li><a href="pages.html">Pages &mdash; where widgets are placed</a></li>
+	<li><a href="templates.html#adt">ADTs &mdash; restyling widget output</a></li>
+	<li><a href="collections.html#providers">Collection providers &mdash; a legitimate module use case</a></li>
+	<li><a href="objects.html">Objects &mdash; what replaced most Service Builder work</a></li>
+	<li><a href="theme-design.html">Themes &mdash; the WAR-to-CET migration</a></li>
+</ul>
+
+<h2>Decision, in order</h2>
+<ol>
+	<li>Can a built-in widget or <a href="collections.html">collection</a> do it? &rarr; done, no code.</li>
+	<li>Can a <a href="fragments.html">fragment</a> do it? &rarr; done, no deploy pipeline.</li>
+	<li>Can an <a href="objects.html">Object</a> + <a href="workflow.html#actions">object action</a> do it? &rarr; done, no code.</li>
+	<li>Can a <a href="client-extensions.html">CET</a> do it? &rarr; done, and it survives upgrades.</li>
+	<li>Only then: an OSGi module &mdash; and write down why, because the next person will ask.</li>
+</ol>
+		<footer class="pagefoot">
+			Part of the <a href="index.html">Liferay Component Guide</a>.
+			Not sure which component fits? Start at <a href="decision-guide.html">What should I use?</a>
+		</footer>
+	</main>
+</div>
+</body>
+</html>
