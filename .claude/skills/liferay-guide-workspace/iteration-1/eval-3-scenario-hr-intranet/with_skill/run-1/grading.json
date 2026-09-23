@@ -1,0 +1,60 @@
+{
+  "expectations": [
+    {
+      "text": "Recommends an Object for leave requests",
+      "passed": true,
+      "evidence": "LeaveRequest Object"
+    },
+    {
+      "text": "Recommends a picklist for leave type",
+      "passed": true,
+      "evidence": "Picklist LEAVE_TYPE"
+    },
+    {
+      "text": "Recommends a workflow (Kaleo single approver or equivalent) for manager approval",
+      "passed": true,
+      "evidence": "Kaleo workflow, single approver"
+    },
+    {
+      "text": "Handles per-department totals with typed data/aggregation rather than client-side counting",
+      "passed": true,
+      "evidence": "SUM Aggregation field on Department"
+    },
+    {
+      "text": "Recommends Web Content with a structure for vacancies (editor-owned)",
+      "passed": true,
+      "evidence": "Vacancy structure web content"
+    },
+    {
+      "text": "Uses a display page template and/or collection for the vacancies listing",
+      "passed": true,
+      "evidence": "dynamic collection + display page template"
+    },
+    {
+      "text": "Mentions Guest permissions for the public vacancies page",
+      "passed": true,
+      "evidence": "Guest VIEW for vacancies, 7 mentions"
+    },
+    {
+      "text": "Includes a need-to-component table",
+      "passed": true,
+      "evidence": "need/use/why/not-this table"
+    },
+    {
+      "text": "Includes a wiring/composition diagram or chain",
+      "passed": true,
+      "evidence": "ASCII wiring diagram"
+    },
+    {
+      "text": "Cites guide pages with anchors",
+      "passed": true,
+      "evidence": "13 page#anchor citations"
+    }
+  ],
+  "summary": {
+    "passed": 10,
+    "failed": 0,
+    "total": 10,
+    "pass_rate": 1.0
+  }
+}

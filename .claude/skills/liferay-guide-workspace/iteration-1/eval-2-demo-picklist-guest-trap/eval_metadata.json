@@ -1,0 +1,14 @@
+{
+  "eval_id": 2,
+  "eval_name": "demo-picklist-guest-trap",
+  "prompt": "The objects page says Guest can't read a picklist over REST ... show me in practice on my local Liferay ...",
+  "assertions": [
+    "Actually created a Demo-prefixed picklist in the live instance (evidence: id/ERC in answer or notes)",
+    "Called the picklist endpoint as admin and got a 2xx with entries",
+    "Called the same endpoint as an anonymous/Guest visitor in an isolated context (no user sign-out) and reported the actual status",
+    "Saved at least one screenshot into outputs",
+    "Only operated on Chrome tabs it opened itself",
+    "Deleted the demo items and reported cleanup",
+    "Ties the result back to objects.html#picklists (and/or forms/permissions guest trap)"
+  ]
+}

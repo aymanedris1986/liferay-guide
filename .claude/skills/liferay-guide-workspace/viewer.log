@@ -1,0 +1,14 @@
+Note: lsof not found, cannot check if port is in use
+
+  Eval Viewer
+Traceback (most recent call last):
+  File "C:\Users\ThinkPad\.claude\plugins\cache\claude-plugins-official\skill-creator\db467cc56673\skills\skill-creator\eval-viewer\generate_review.py", line 471, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\ThinkPad\.claude\plugins\cache\claude-plugins-official\skill-creator\db467cc56673\skills\skill-creator\eval-viewer\generate_review.py", line 451, in main
+    print(f"  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 2-34: character maps to <undefined>

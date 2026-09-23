@@ -1,0 +1,60 @@
+{
+  "expectations": [
+    {
+      "text": "Recommends an Object for leave requests",
+      "passed": true,
+      "evidence": "LeaveRequest Object"
+    },
+    {
+      "text": "Recommends a picklist for leave type",
+      "passed": true,
+      "evidence": "picklist for type"
+    },
+    {
+      "text": "Recommends a workflow (Kaleo single approver or equivalent) for manager approval",
+      "passed": true,
+      "evidence": "Single Approver Kaleo"
+    },
+    {
+      "text": "Handles per-department totals with typed data/aggregation rather than client-side counting",
+      "passed": true,
+      "evidence": "Aggregation field sums days"
+    },
+    {
+      "text": "Recommends Web Content with a structure for vacancies (editor-owned)",
+      "passed": true,
+      "evidence": "Vacancy structure"
+    },
+    {
+      "text": "Uses a display page template and/or collection for the vacancies listing",
+      "passed": true,
+      "evidence": "collection + display page template"
+    },
+    {
+      "text": "Mentions Guest permissions for the public vacancies page",
+      "passed": true,
+      "evidence": "'Web Content gives Guest VIEW on new articles by default'"
+    },
+    {
+      "text": "Includes a need-to-component table",
+      "passed": true,
+      "evidence": "tables present"
+    },
+    {
+      "text": "Includes a wiring/composition diagram or chain",
+      "passed": true,
+      "evidence": "wiring diagram present"
+    },
+    {
+      "text": "Cites guide pages with anchors",
+      "passed": false,
+      "evidence": "no guide page/anchor citations in the answer"
+    }
+  ],
+  "summary": {
+    "passed": 9,
+    "failed": 1,
+    "total": 10,
+    "pass_rate": 0.9
+  }
+}

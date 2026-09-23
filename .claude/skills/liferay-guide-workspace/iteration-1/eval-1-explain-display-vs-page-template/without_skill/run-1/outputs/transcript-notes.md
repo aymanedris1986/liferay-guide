@@ -1,0 +1,7 @@
+- Grep "Display Page Template" in src/ (count per file)
+- Grep "display page|page template" in src/ with context (large output, previewed)
+- Read src/templates.html (full)
+- Grep src/decision-guide.html for display page / page template rows
+- Bash grep on pages.html, web-content.html, collections.html, documents-media.html for display page / friendly URL mentions
+- Bash grep documents-media.html for policy/document type; sed decision-guide.html lines 70-90 (Web Content vs Object tie-breakers)
+- Wrote answer.md and transcript-notes.md (no guide files modified; liferay-guide skill and .claude/ contents not used)

@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "eval_name": "explain-display-vs-page-template",
+  "prompt": "In the guide, what's the actual difference between a Display Page Template and a Page Template? We have ~40 HR policy documents and each one needs its own page on the intranet. Which one do I use and what goes wrong if I pick the other?",
+  "assertions": [
+    "Recommends a Display Page Template for the 40 policy pages",
+    "States that a Page Template is copied at creation and later edits do not propagate",
+    "Mentions a collection (or similar index) for listing the policies",
+    "Cites guide locations as page.html#anchor (e.g. templates.html#display)",
+    "Labels any claim not from the guide as such (or makes no out-of-guide claims)",
+    "Ends by offering to build/demo it in the local Liferay"
+  ]
+}

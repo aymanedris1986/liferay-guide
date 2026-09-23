@@ -1,0 +1,409 @@
+{
+  "metadata": {
+    "skill_name": "liferay-guide",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-09-23T16:47:15Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 632.0,
+        "tokens": 61320,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Recommends a Display Page Template for the 40 policy pages",
+          "passed": true,
+          "evidence": "'use a Display Page Template'"
+        },
+        {
+          "text": "States that a Page Template is copied at creation and later edits do not propagate",
+          "passed": true,
+          "evidence": "'Nothing changes on existing pages. Copy, not link'"
+        },
+        {
+          "text": "Mentions a collection (or similar index) for listing the policies",
+          "passed": true,
+          "evidence": "/policies Collection Display + dynamic collection"
+        },
+        {
+          "text": "Cites guide locations as page.html#anchor (e.g. templates.html#display)",
+          "passed": true,
+          "evidence": "links templates.html#display, #pagetemplate, #master"
+        },
+        {
+          "text": "Labels any claim not from the guide as such (or makes no out-of-guide claims)",
+          "passed": true,
+          "evidence": "point 4 marked '(the consequence is my inference; the guide doesn't state it)'"
+        },
+        {
+          "text": "Ends by offering to build/demo it in the local Liferay",
+          "passed": true,
+          "evidence": "'Want me to build this in your local Liferay\u2026'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 7,
+        "failed": 0,
+        "total": 7,
+        "time_seconds": 695.3,
+        "tokens": 74310,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Actually created a Demo-prefixed picklist in the live instance (evidence: id/ERC in answer or notes)",
+          "passed": true,
+          "evidence": "Demo Status DEMO_STATUS id 35972"
+        },
+        {
+          "text": "Called the picklist endpoint as admin and got a 2xx with entries",
+          "passed": true,
+          "evidence": "admin 200, 3 entries"
+        },
+        {
+          "text": "Called the same endpoint as an anonymous/Guest visitor in an isolated context (no user sign-out) and reported the actual status",
+          "passed": true,
+          "evidence": "isolatedContext guest tab 19 -> 403 empty body"
+        },
+        {
+          "text": "Saved at least one screenshot into outputs",
+          "passed": true,
+          "evidence": "01-admin-select-populated.png, 02-guest-empty-select.png"
+        },
+        {
+          "text": "Only operated on Chrome tabs it opened itself",
+          "passed": true,
+          "evidence": "only tabs 10/13 and 19, verified via list_pages"
+        },
+        {
+          "text": "Deleted the demo items and reported cleanup",
+          "passed": true,
+          "evidence": "DELETE 204, GET ERC 404 (independently confirmed)"
+        },
+        {
+          "text": "Ties the result back to objects.html#picklists (and/or forms/permissions guest trap)",
+          "passed": true,
+          "evidence": "ties to objects.html#picklists and forms traps"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 10,
+        "failed": 0,
+        "total": 10,
+        "time_seconds": 679.8,
+        "tokens": 93879,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Recommends an Object for leave requests",
+          "passed": true,
+          "evidence": "LeaveRequest Object"
+        },
+        {
+          "text": "Recommends a picklist for leave type",
+          "passed": true,
+          "evidence": "Picklist LEAVE_TYPE"
+        },
+        {
+          "text": "Recommends a workflow (Kaleo single approver or equivalent) for manager approval",
+          "passed": true,
+          "evidence": "Kaleo workflow, single approver"
+        },
+        {
+          "text": "Handles per-department totals with typed data/aggregation rather than client-side counting",
+          "passed": true,
+          "evidence": "SUM Aggregation field on Department"
+        },
+        {
+          "text": "Recommends Web Content with a structure for vacancies (editor-owned)",
+          "passed": true,
+          "evidence": "Vacancy structure web content"
+        },
+        {
+          "text": "Uses a display page template and/or collection for the vacancies listing",
+          "passed": true,
+          "evidence": "dynamic collection + display page template"
+        },
+        {
+          "text": "Mentions Guest permissions for the public vacancies page",
+          "passed": true,
+          "evidence": "Guest VIEW for vacancies, 7 mentions"
+        },
+        {
+          "text": "Includes a need-to-component table",
+          "passed": true,
+          "evidence": "need/use/why/not-this table"
+        },
+        {
+          "text": "Includes a wiring/composition diagram or chain",
+          "passed": true,
+          "evidence": "ASCII wiring diagram"
+        },
+        {
+          "text": "Cites guide pages with anchors",
+          "passed": true,
+          "evidence": "13 page#anchor citations"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.67,
+        "passed": 4,
+        "failed": 2,
+        "total": 6,
+        "time_seconds": 46.6,
+        "tokens": 53916,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Recommends a Display Page Template for the 40 policy pages",
+          "passed": true,
+          "evidence": "'Use a Display Page Template.'"
+        },
+        {
+          "text": "States that a Page Template is copied at creation and later edits do not propagate",
+          "passed": true,
+          "evidence": "'Copy, not link'"
+        },
+        {
+          "text": "Mentions a collection (or similar index) for listing the policies",
+          "passed": true,
+          "evidence": "dynamic collection on /policies"
+        },
+        {
+          "text": "Cites guide locations as page.html#anchor (e.g. templates.html#display)",
+          "passed": false,
+          "evidence": "cites 'src/templates.html (sections #display and #pagetemplate)' as a closing list, no page#anchor links inline"
+        },
+        {
+          "text": "Labels any claim not from the guide as such (or makes no out-of-guide claims)",
+          "passed": true,
+          "evidence": "no out-of-guide claims detected"
+        },
+        {
+          "text": "Ends by offering to build/demo it in the local Liferay",
+          "passed": false,
+          "evidence": "no demo offer"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.71,
+        "passed": 5,
+        "failed": 2,
+        "total": 7,
+        "time_seconds": 246.1,
+        "tokens": 66806,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Actually created a Demo-prefixed picklist in the live instance (evidence: id/ERC in answer or notes)",
+          "passed": false,
+          "evidence": "Created picklist ZZDEMO_GUEST_PICKLIST, not Demo-prefixed; plus an unrequested Service Access Policy"
+        },
+        {
+          "text": "Called the picklist endpoint as admin and got a 2xx with entries",
+          "passed": true,
+          "evidence": "admin 200 on entries"
+        },
+        {
+          "text": "Called the same endpoint as an anonymous/Guest visitor in an isolated context (no user sign-out) and reported the actual status",
+          "passed": true,
+          "evidence": "logged-out isolated tab 20 -> 403 before SAP change"
+        },
+        {
+          "text": "Saved at least one screenshot into outputs",
+          "passed": true,
+          "evidence": "guest-select-empty.png"
+        },
+        {
+          "text": "Only operated on Chrome tabs it opened itself",
+          "passed": true,
+          "evidence": "only pageId 20"
+        },
+        {
+          "text": "Deleted the demo items and reported cleanup",
+          "passed": false,
+          "evidence": "SAP ZZDEMO_LISTTYPE_GUEST (id 35979) left on the instance; delete was blocked"
+        },
+        {
+          "text": "Ties the result back to objects.html#picklists (and/or forms/permissions guest trap)",
+          "passed": true,
+          "evidence": "ties to objects page claim, extends with SAP-vs-permission gate analysis"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.9,
+        "passed": 9,
+        "failed": 1,
+        "total": 10,
+        "time_seconds": 692.8,
+        "tokens": 97272,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Recommends an Object for leave requests",
+          "passed": true,
+          "evidence": "LeaveRequest Object"
+        },
+        {
+          "text": "Recommends a picklist for leave type",
+          "passed": true,
+          "evidence": "picklist for type"
+        },
+        {
+          "text": "Recommends a workflow (Kaleo single approver or equivalent) for manager approval",
+          "passed": true,
+          "evidence": "Single Approver Kaleo"
+        },
+        {
+          "text": "Handles per-department totals with typed data/aggregation rather than client-side counting",
+          "passed": true,
+          "evidence": "Aggregation field sums days"
+        },
+        {
+          "text": "Recommends Web Content with a structure for vacancies (editor-owned)",
+          "passed": true,
+          "evidence": "Vacancy structure"
+        },
+        {
+          "text": "Uses a display page template and/or collection for the vacancies listing",
+          "passed": true,
+          "evidence": "collection + display page template"
+        },
+        {
+          "text": "Mentions Guest permissions for the public vacancies page",
+          "passed": true,
+          "evidence": "'Web Content gives Guest VIEW on new articles by default'"
+        },
+        {
+          "text": "Includes a need-to-component table",
+          "passed": true,
+          "evidence": "tables present"
+        },
+        {
+          "text": "Includes a wiring/composition diagram or chain",
+          "passed": true,
+          "evidence": "wiring diagram present"
+        },
+        {
+          "text": "Cites guide pages with anchors",
+          "passed": false,
+          "evidence": "no guide page/anchor citations in the answer"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 669.0333,
+        "stddev": 32.9949,
+        "min": 632.0,
+        "max": 695.3
+      },
+      "tokens": {
+        "mean": 76503.0,
+        "stddev": 16389.9072,
+        "min": 61320,
+        "max": 93879
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.76,
+        "stddev": 0.1229,
+        "min": 0.67,
+        "max": 0.9
+      },
+      "time_seconds": {
+        "mean": 328.5,
+        "stddev": 330.8866,
+        "min": 46.6,
+        "max": 692.8
+      },
+      "tokens": {
+        "mean": 72664.6667,
+        "stddev": 22263.8421,
+        "min": 53916,
+        "max": 97272
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.24",
+      "time_seconds": "+340.5",
+      "tokens": "+3838"
+    }
+  },
+  "notes": [
+    "Non-discriminating: most content assertions (Object/picklist/workflow/aggregation/display page) pass in both configs; the guide itself is strong, so raw reading gets the substance right.",
+    "Discriminating: page#anchor citations, flagging out-of-guide claims, demo offer, Demo- naming, and cleanup/safety of shared settings.",
+    "Biggest qualitative gap: baseline demo created an unrequested Service Access Policy and left it on the instance; with-skill run refused to change shared settings and offered to test with approval.",
+    "Time is not comparable: 4 runs ran in parallel (~630-690s each, incl. baseline eval-3); the baseline demo ran alone (246s) and baseline eval-1 was 47s.",
+    "Skill run hit a guide.py stdout OSError on Windows console; fix before iteration 2."
+  ]
+}

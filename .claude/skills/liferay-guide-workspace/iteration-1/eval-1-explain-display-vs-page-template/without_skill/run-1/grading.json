@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "Recommends a Display Page Template for the 40 policy pages",
+      "passed": true,
+      "evidence": "'Use a Display Page Template.'"
+    },
+    {
+      "text": "States that a Page Template is copied at creation and later edits do not propagate",
+      "passed": true,
+      "evidence": "'Copy, not link'"
+    },
+    {
+      "text": "Mentions a collection (or similar index) for listing the policies",
+      "passed": true,
+      "evidence": "dynamic collection on /policies"
+    },
+    {
+      "text": "Cites guide locations as page.html#anchor (e.g. templates.html#display)",
+      "passed": false,
+      "evidence": "cites 'src/templates.html (sections #display and #pagetemplate)' as a closing list, no page#anchor links inline"
+    },
+    {
+      "text": "Labels any claim not from the guide as such (or makes no out-of-guide claims)",
+      "passed": true,
+      "evidence": "no out-of-guide claims detected"
+    },
+    {
+      "text": "Ends by offering to build/demo it in the local Liferay",
+      "passed": false,
+      "evidence": "no demo offer"
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 2,
+    "total": 6,
+    "pass_rate": 0.67
+  }
+}

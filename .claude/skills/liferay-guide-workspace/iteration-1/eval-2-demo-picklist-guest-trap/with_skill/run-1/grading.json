@@ -1,0 +1,45 @@
+{
+  "expectations": [
+    {
+      "text": "Actually created a Demo-prefixed picklist in the live instance (evidence: id/ERC in answer or notes)",
+      "passed": true,
+      "evidence": "Demo Status DEMO_STATUS id 35972"
+    },
+    {
+      "text": "Called the picklist endpoint as admin and got a 2xx with entries",
+      "passed": true,
+      "evidence": "admin 200, 3 entries"
+    },
+    {
+      "text": "Called the same endpoint as an anonymous/Guest visitor in an isolated context (no user sign-out) and reported the actual status",
+      "passed": true,
+      "evidence": "isolatedContext guest tab 19 -> 403 empty body"
+    },
+    {
+      "text": "Saved at least one screenshot into outputs",
+      "passed": true,
+      "evidence": "01-admin-select-populated.png, 02-guest-empty-select.png"
+    },
+    {
+      "text": "Only operated on Chrome tabs it opened itself",
+      "passed": true,
+      "evidence": "only tabs 10/13 and 19, verified via list_pages"
+    },
+    {
+      "text": "Deleted the demo items and reported cleanup",
+      "passed": true,
+      "evidence": "DELETE 204, GET ERC 404 (independently confirmed)"
+    },
+    {
+      "text": "Ties the result back to objects.html#picklists (and/or forms/permissions guest trap)",
+      "passed": true,
+      "evidence": "ties to objects.html#picklists and forms traps"
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "failed": 0,
+    "total": 7,
+    "pass_rate": 1.0
+  }
+}

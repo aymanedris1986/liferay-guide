@@ -1,0 +1,17 @@
+{
+  "eval_id": 3,
+  "eval_name": "scenario-hr-intranet",
+  "prompt": "Scenario for the Badael intranet: leave requests, manager approval, per-department totals, public vacancies page ...",
+  "assertions": [
+    "Recommends an Object for leave requests",
+    "Recommends a picklist for leave type",
+    "Recommends a workflow (Kaleo single approver or equivalent) for manager approval",
+    "Handles per-department totals with typed data/aggregation rather than client-side counting",
+    "Recommends Web Content with a structure for vacancies (editor-owned)",
+    "Uses a display page template and/or collection for the vacancies listing",
+    "Mentions Guest permissions for the public vacancies page",
+    "Includes a need-to-component table",
+    "Includes a wiring/composition diagram or chain",
+    "Cites guide pages with anchors"
+  ]
+}

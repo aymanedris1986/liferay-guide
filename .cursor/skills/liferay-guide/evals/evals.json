@@ -1,0 +1,26 @@
+{
+  "skill_name": "liferay-guide",
+  "evals": [
+    {
+      "id": 1,
+      "name": "explain-display-vs-page-template",
+      "prompt": "In the guide, what's the actual difference between a Display Page Template and a Page Template? We have ~40 HR policy documents and each one needs its own page on the intranet. Which one do I use and what goes wrong if I pick the other?",
+      "expected_output": "Grounded explanation citing templates.html#display and #pagetemplate, recommends Display Page Template (one template, URL per item) + collection for the index, mentions page-template copies don't propagate, flags non-guide info, offers a live demo.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "demo-picklist-guest-trap",
+      "prompt": "The objects page says Guest can't read a picklist over REST and that public forms end up with empty selects. I don't fully believe it — show me in practice on my local Liferay (localhost:8080, test@liferay.com/test). You have my go-ahead to create throwaway demo items, just clean up afterwards.",
+      "expected_output": "Builds a Demo picklist in the live instance via Chrome DevTools MCP in its own tab, calls the list-type endpoint as admin (200) and as Guest in an isolated context (403), screenshots, reports evidence tied to objects.html#picklists, cleans up the demo items, never touches other tabs.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "scenario-hr-intranet",
+      "prompt": "Scenario for the Badael intranet: employees submit leave requests (type, start/end date, days), their manager approves or rejects, HR wants a page showing total leave days used per department, and there's a public 'Open vacancies' page that the HR team writes and updates themselves (job description, requirements, apply link). Which Liferay components should we use for each part, and how do they fit together?",
+      "expected_output": "Need→component table: Leave request = Object (+picklist for type, relationship to employee/department), approval = Kaleo single approver workflow on the object (or object action), per-department totals = aggregation field / typed data not browser counting, vacancies = Web Content + structure + display page template + collection, public Guest permissions, site initializer for repeatability; wiring diagram; traps; open questions; cites guide pages.",
+      "files": []
+    }
+  ]
+}
