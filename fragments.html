@@ -60,24 +60,44 @@
 <p>A <b>fragment</b> is a small, self-contained piece of a page &mdash; a hero, a card row, a CTA &mdash; written in plain HTML/CSS/JS, with declared <b>configuration options</b> and <b>editable elements</b>, that a non-developer can drop onto a <a href="pages.html">content page</a> and adjust without touching code.</p>
 
 <h2>Anatomy</h2>
-<div class="ascii">fragments/group/&lt;collection-key&gt;/
+<div class="ascii">fragments/group/&lt;collection-key&gt;/     ← the directory name IS the set key
 ├── collection.json                 {"name": "Badael Home", "description": "…"}
+├── resources/                      images/fonts shared by the set (optional)
+│   └── hero-bg.jpg                 referenced as [resources:hero-bg.jpg]
 └── fragments/
     └── home-hero/                  ← the directory name IS the fragment key
-        ├── fragment.json           name, type, css/js/html file pointers
-        ├── index.html              the markup
-        ├── index.css               scoped styles
+        ├── fragment.json           name, type, file pointers
+        ├── index.html              the markup (FreeMarker runs here)
+        ├── index.css               styles (NOT scoped, NOT FreeMarker)
         ├── index.js                behaviour (optional)
         ├── configuration.json      the options editors see (optional)
         └── thumbnail.png           sidebar preview (optional)</div>
 
+<p>The file names are not magic &mdash; <code>fragment.json</code> points at them. These are the keys the importer actually reads (<code>FragmentsImporterImpl</code>, 2026.Q2):</p>
+<pre><code>{
+	"cacheable": false,
+	"configurationPath": "configuration.json",
+	"cssPath": "index.css",
+	"htmlPath": "index.html",
+	"icon": "square",
+	"jsPath": "index.js",
+	"name": "Home Hero",
+	"thumbnailPath": "thumbnail.png",
+	"type": "component"
+}</code></pre>
+<p>There is no <code>key</code> field: the fragment key is the directory name, and that key is what <a href="pages.html">page definitions</a> reference. <code>cacheable: true</code> lets Liferay cache the rendered HTML &mdash; only safe for fragments whose output does not depend on the user, the request, or <code>[#if]</code> logic over live data.</p>
+<div class="callout trap">
+	<b>A missing or misspelled <code>"type"</code> silently makes it a section fragment</b>
+	<p><code>FragmentConstants.getTypeFromLabel</code> recognises <code>component</code>, <code>input</code>, <code>react</code> and <code>widget</code>; anything else &mdash; no <code>type</code> at all, or a typo such as <code>"compnent"</code> &mdash; falls back to <b>section</b>, the legacy type. Always write <code>"type": "component"</code> explicitly. See the <a href="#types">section-fragment warning</a> below for why that matters.</p>
+</div>
+
 <h3>The four moving parts</h3>
 <div class="wrap"><table>
 	<tr><th>Part</th><th>Who controls it</th><th>Purpose</th></tr>
-	<tr><td><code>index.html</code></td><td>You</td><td>Markup, with editable markers and <code>${configuration.*}</code> interpolation</td></tr>
+	<tr><td><code>index.html</code></td><td>You</td><td>Markup, with editable markers, drop zones, and FreeMarker (<code>${configuration.*}</code>, <code>[#if]</code>, <code>[#list]</code>)</td></tr>
 	<tr><td><code>configuration.json</code></td><td>You define, editor chooses</td><td>Per-placement options: heading level, alignment, colour, item count</td></tr>
 	<tr><td>Editable elements</td><td>Editor types, or maps</td><td>The text/image an editor edits in place, or maps to a content field</td></tr>
-	<tr><td><code>index.css</code> / <code>index.js</code></td><td>You</td><td>Styles and behaviour, namespaced per placement</td></tr>
+	<tr><td><code>index.css</code> / <code>index.js</code></td><td>You</td><td>Styles (global &mdash; see traps) and behaviour (runs once per placement)</td></tr>
 </table></div>
 
 <h2>Editable elements &mdash; where content actually enters</h2>
@@ -91,13 +111,26 @@
 &lt;a data-lfr-editable-id="hero-cta" data-lfr-editable-type="link" href="#"&gt;Read more&lt;/a&gt;</code></pre>
 <div class="wrap"><table>
 	<tr><th><code>data-lfr-editable-type</code></th><th>Editor gets</th></tr>
-	<tr><td><code>text</code></td><td>Plain text, inline</td></tr>
-	<tr><td><code>rich-text</code></td><td>A WYSIWYG toolbar</td></tr>
-	<tr><td><code>image</code></td><td>Media picker (<a href="documents-media.html">Documents &amp; Media</a>)</td></tr>
-	<tr><td><code>link</code></td><td>URL, page picker, target</td></tr>
+	<tr><td><code>text</code></td><td>Plain text, inline. HTML is stripped.</td></tr>
+	<tr><td><code>rich-text</code></td><td>A formatting toolbar. Put it on a block element such as <code>&lt;div&gt;</code>, not <code>&lt;p&gt;</code> &mdash; the content itself contains block elements.</td></tr>
+	<tr><td><code>image</code></td><td>Media picker (<a href="documents-media.html">Documents &amp; Media</a>) or URL; alt text</td></tr>
+	<tr><td><code>link</code></td><td>URL, page picker, or a mapped field; target</td></tr>
 	<tr><td><code>html</code></td><td>Raw markup</td></tr>
-	<tr><td><code>backgroundImage</code></td><td>Background image picker on a container</td></tr>
+	<tr><td><code>date-time</code></td><td>A date, typically mapped to a date field, with a display format</td></tr>
+	<tr><td><code>action</code></td><td>A button that triggers an <a href="objects.html">Object</a> action on the mapped entry</td></tr>
 </table></div>
+
+<h3>Background images are an attribute, not an editable type</h3>
+<p>There is no <code>backgroundImage</code> value for <code>data-lfr-editable-type</code>. An editable background is a separate attribute on the container:</p>
+<pre><code>&lt;div class="badael-hero" data-lfr-background-image-id="hero-bg"&gt;
+	&lt;h1 data-lfr-editable-id="hero-title" data-lfr-editable-type="text"&gt;Welcome&lt;/h1&gt;
+&lt;/div&gt;</code></pre>
+<p>The editor gets an image picker in the fragment's sidebar and Liferay writes the chosen image as an inline <code>background-image</code>. It can be mapped like any image editable, which is how a display page hero takes the article's own image.</p>
+
+<div class="callout warn">
+	<b>Editable IDs are storage keys &mdash; treat them as a public API</b>
+	<p>Whatever an editor typed or mapped is stored against <code>data-lfr-editable-id</code> in each placement's editable values. Rename the ID and existing placements lose that content the next time the fragment code reaches them. IDs must be unique within the fragment, and editables cannot be nested inside other editables.</p>
+</div>
 
 <h3 id="mapping">Mapping &mdash; the part people miss</h3>
 <p>An editable element does not have to hold typed text. It can be <b>mapped</b> to a field of a content item, which is how one fragment renders a thousand different records:</p>
@@ -107,6 +140,19 @@
 	<li>Map to <b>the collection item</b> inside a <a href="collections.html">Collection Display</a> &rarr; one card fragment, N rows.</li>
 </ul>
 <p>Mapped fragments are what turn a static design into a CMS. A fragment with only typed-in text is a nicely styled dead end.</p>
+<p>The mapping panel only offers fields compatible with the editable's type &mdash; an <code>image</code> editable lists image fields, not text. So choose the editable type for what the field <em>is</em>, not for how it looks.</p>
+
+<h2 id="dropzones">Drop zones &mdash; fragments that hold other fragments</h2>
+<p>A fragment can reserve areas where editors drop <em>other</em> fragments and widgets:</p>
+<pre><code>&lt;div class="badael-two-col"&gt;
+	&lt;aside&gt;&lt;lfr-drop-zone data-lfr-drop-zone-id="side"&gt;&lt;/lfr-drop-zone&gt;&lt;/aside&gt;
+	&lt;main&gt;&lt;lfr-drop-zone data-lfr-drop-zone-id="main"&gt;&lt;/lfr-drop-zone&gt;&lt;/main&gt;
+&lt;/div&gt;</code></pre>
+<p>Give every drop zone a <code>data-lfr-drop-zone-id</code>. Without it, content is matched to zones by <em>position</em>, so inserting a new zone between two existing ones shifts everything placed in them into the wrong zone. Custom elements cannot self-close &mdash; write <code>&lt;lfr-drop-zone&gt;&lt;/lfr-drop-zone&gt;</code>, not <code>&lt;lfr-drop-zone/&gt;</code>. In a page definition, the contents of a zone appear as a <code>FragmentDropZone</code> page element.</p>
+<p>Use drop zones for genuine layout shells (tabs, accordions, two-column bands). For a plain grid the built-in <b>Container</b> and <b>Grid</b> elements are better &mdash; they have responsive and spacing settings you would otherwise rebuild.</p>
+
+<h3>Embedding widgets</h3>
+<p><code>&lt;lfr-widget-nav&gt;&lt;/lfr-widget-nav&gt;</code>, <code>&lt;lfr-widget-web-content&gt;</code>, <code>&lt;lfr-widget-asset-list&gt;</code> and friends embed a <a href="widgets-modules.html">widget</a> directly in the fragment markup. Handy for a header fragment that must always contain the menu; each embedded widget keeps its own portlet preferences per placement.</p>
 
 <h2>Configuration options</h2>
 <pre><code>{
@@ -118,6 +164,7 @@
 					"name": "headingLevel",
 					"label": "Heading level",
 					"type": "select",
+					"dataType": "string",
 					"defaultValue": "h2",
 					"typeOptions": { "validValues": [ {"value": "h1"}, {"value": "h2"}, {"value": "h3"} ] }
 				},
@@ -129,28 +176,81 @@
 <p>Values land in the markup as FreeMarker variables:</p>
 <pre><code>&lt;${configuration.headingLevel} class="component-heading" data-lfr-editable-id="element-text" data-lfr-editable-type="text"&gt;
 	Heading Example
-&lt;/${configuration.headingLevel}&gt;</code></pre>
+&lt;/${configuration.headingLevel}&gt;
+
+[#if configuration.showImage]
+	&lt;img data-lfr-editable-id="hero-image" data-lfr-editable-type="image" src="" alt=""&gt;
+[/#if]</code></pre>
 <div class="wrap"><table>
-	<tr><th>Field type</th><th>Use for</th></tr>
-	<tr><td><code>text</code>, <code>select</code>, <code>checkbox</code>, <code>colorPicker</code></td><td>Ordinary options</td></tr>
-	<tr><td><code>itemSelector</code></td><td>Let the editor pick a content item</td></tr>
-	<tr><td><code>collectionSelector</code></td><td>Let the editor pick a <a href="collections.html">collection</a>; iterate <code>collectionObjectList</code></td></tr>
+	<tr><th>Field type</th><th>Use for</th><th>Value in FreeMarker</th></tr>
+	<tr><td><code>text</code></td><td>Free text, optionally validated (<code>typeOptions.validation</code>)</td><td><code>${configuration.x}</code></td></tr>
+	<tr><td><code>select</code>, <code>checkbox</code></td><td>Fixed choices, on/off</td><td>typed by <code>dataType</code> (<code>string</code>, <code>int</code>, &hellip;)</td></tr>
+	<tr><td><code>colorPicker</code></td><td>Any colour, or a style book colour</td><td>a hex value <em>or</em> <code>var(--token)</code> &mdash; use it in a <code>style</code>, not a class</td></tr>
+	<tr><td><code>colorPalette</code></td><td>One of the theme's named colours</td><td><code>${configuration.x.color}</code>, e.g. for <code>text-${&hellip;}</code> classes</td></tr>
+	<tr><td><code>length</code></td><td>A size with a unit (<code>300px</code>, <code>2rem</code>)</td><td>the string</td></tr>
+	<tr><td><code>url</code></td><td>A URL or a page picked from the site</td><td>the URL</td></tr>
+	<tr><td><code>itemSelector</code></td><td>Let the editor pick a content item (filter with <code>typeOptions.itemType</code>)</td><td><code>configuration.x</code>, plus <code>xObject</code> for the Java object</td></tr>
+	<tr><td><code>collectionSelector</code></td><td>Let the editor pick a <a href="collections.html">collection</a> (filter with <code>itemType</code>, cap with <code>numberOfItems</code>)</td><td><code>xObjectList</code> &mdash; the field name plus <code>ObjectList</code></td></tr>
+	<tr><td><code>navigationMenuSelector</code></td><td>A menu source (2024.Q1+)</td><td><code>xObject.navItems</code>, <code>xObject.branchNavItems</code></td></tr>
+	<tr><td><code>videoSelector</code></td><td>A video, for external-video fragments</td><td>&mdash;</td></tr>
 </table></div>
-<pre><code>[#list collectionObjectList as item]
-	&lt;li&gt;${item.title}&lt;/li&gt;
-[/#list]</code></pre>
+<p>The collection variable name comes from the field name. A field called <code>collection</code> yields <code>collectionObjectList</code>; one called <code>featured</code> yields <code>featuredObjectList</code>. Guard it, because it is absent until an editor picks something:</p>
+<pre><code>[#if collectionObjectList??]
+	&lt;ul&gt;
+	[#list collectionObjectList as item]
+		&lt;li&gt;${item.title}&lt;/li&gt;
+	[/#list]
+	&lt;/ul&gt;
+[/#if]</code></pre>
+<p>A <code>collectionSelector</code> is the "code it yourself" alternative to a Collection Display: full control of the markup, but no editor-side mapping, pagination, or filter fragments. Prefer the Collection Display unless the markup genuinely cannot be expressed as per-item fragments.</p>
+
+<h3>FreeMarker in fragments &mdash; what is different from templates</h3>
+<ul>
+	<li><b>Square-bracket syntax only.</b> Liferay prepends <code>[#ftl]</code> to the HTML, which switches FreeMarker to square-bracket tags. <code>[#if]</code>, <code>[#list]</code>, <code>[#assign]</code> work; <code>&lt;#if&gt;</code> is emitted as literal text. <code>${&hellip;}</code> interpolation is unaffected.</li>
+	<li><b>HTML only.</b> FreeMarker runs on <code>index.html</code>. It does <em>not</em> run on <code>index.css</code> or <code>index.js</code> &mdash; the CSS only has <code>[resources:&hellip;]</code> substitution.</li>
+	<li><b>Variables available:</b> <code>configuration</code>, <code>fragmentElementId</code>, <code>fragmentEntryLinkNamespace</code>, <code>fragmentName</code>, <code>layoutMode</code> (<code>view</code>/<code>edit</code>), the <code>&hellip;Object</code>/<code>&hellip;ObjectList</code> helpers above, <code>input</code> for input fragments, and the usual <code>themeDisplay</code> context.</li>
+	<li><b>It can be switched off.</b> FreeMarker processing for fragments is an instance-level setting (<code>FreeMarkerFragmentEntryProcessorConfiguration</code>); with it off, custom fragments render their template text unprocessed. If <code>${&hellip;}</code> shows up literally on a page, check this first.</li>
+</ul>
+
+<h2 id="js">Fragment JavaScript</h2>
+<p>Your <code>index.js</code> is wrapped per placement &mdash; in an IIFE, or a <code>&lt;script type="module"&gt;</code> when JS modules are enabled &mdash; with these constants already declared:</p>
+<div class="wrap"><table>
+	<tr><th>Constant</th><th>What it is</th></tr>
+	<tr><td><code>fragmentElement</code></td><td>The wrapper <code>&lt;div&gt;</code> of <em>this</em> placement. Query inside it, never the document.</td></tr>
+	<tr><td><code>configuration</code></td><td>The same values as FreeMarker's <code>configuration</code>, as a JS object</td></tr>
+	<tr><td><code>fragmentElementId</code></td><td>The wrapper's DOM id</td></tr>
+	<tr><td><code>fragmentEntryLinkNamespace</code></td><td>A per-placement unique string (<code>fragmentNamespace</code> is the deprecated alias)</td></tr>
+	<tr><td><code>layoutMode</code></td><td><code>'view'</code> or <code>'edit'</code> &mdash; skip carousels, timers and redirects in edit mode</td></tr>
+	<tr><td><code>input</code></td><td>Input fragments only: field name, value, errors, required flag</td></tr>
+</table></div>
+<pre><code>// index.js — runs once for every placement of the fragment
+const button = fragmentElement.querySelector('.badael-hero__toggle');
+
+if (layoutMode === 'view' &amp;&amp; button) {
+	button.addEventListener('click', () =&gt; {
+		fragmentElement.classList.toggle('is-open');
+	});
+}</code></pre>
+<p>Because every placement gets its own copy, <code>document.querySelector('.badael-hero')</code> in fragment JS is a bug the moment the fragment is placed twice: both copies grab the first one.</p>
 
 <h2 id="types">Fragment types</h2>
 <div class="wrap"><table>
-	<tr><th>Type</th><th>What it is</th><th>Use for</th></tr>
-	<tr><td><b>Component</b></td><td>The default: a normal building block</td><td>Heroes, cards, CTAs, tables, anything</td></tr>
-	<tr><td><b>Section</b></td><td>A full-width block, usually containing a drop zone</td><td>Page-level bands with nested content</td></tr>
-	<tr><td><b>Input</b></td><td>Binds to an <a href="objects.html">Object</a> field inside a <a href="forms.html">Form Container</a></td><td>Custom form controls &mdash; see <a href="forms.html">Forms</a></td></tr>
-	<tr><td><b>React fragment</b></td><td>Fragment whose JS mounts a React tree</td><td>Interactive widgets that still belong to the page editor</td></tr>
+	<tr><th><code>type</code></th><th>What it is</th><th>Use for</th></tr>
+	<tr><td><code>component</code></td><td>The normal building block</td><td>Heroes, cards, CTAs, tables, anything. This is what you write.</td></tr>
+	<tr><td><code>input</code></td><td>Binds to an <a href="objects.html">Object</a> field inside a <a href="forms.html">Form Container</a>. Declares which field types it accepts in <code>typeOptions.fieldTypes</code>.</td><td>Custom form controls &mdash; see <a href="forms.html">Forms</a></td></tr>
+	<tr><td><code>react</code></td><td>A fragment whose JS is written as React</td><td>Small interactive pieces. For anything app-sized, a <a href="client-extensions.html#customelement">Custom Element CET</a> is sturdier.</td></tr>
+	<tr><td><code>section</code></td><td>The legacy type, and the fallback for a missing or unknown <code>type</code></td><td>Nothing new. Existing ones still render.</td></tr>
+	<tr><td><code>widget</code></td><td>Internal: a fragment wrapper around a widget</td><td>Not something you author</td></tr>
 </table></div>
+<pre><code>// fragment.json of an input fragment — the built-in select-from-list
+{
+	"name": "select",
+	"type": "input",
+	"typeOptions": { "fieldTypes": ["relationship", "select"] }
+}</code></pre>
 <div class="callout warn">
 	<b>Section fragments break the fragment listing API</b>
-	<p>One fragment declaring <code>"type": "section"</code> makes the whole set's <code>headless-admin-fragment</code> listing return <b>400</b>. Verified on 2026.Q2. Harmless for rendering, annoying for tooling.</p>
+	<p>One fragment with type <code>section</code> makes the whole set's <code>headless-admin-fragment</code> listing return <b>400</b>. Verified on 2026.Q2. Harmless for rendering, annoying for tooling &mdash; and because a missing <code>type</code> <em>is</em> <code>section</code>, one forgotten line in one <code>fragment.json</code> is enough.</p>
 </div>
 
 <h2>Fragment vs the alternatives</h2>
@@ -158,6 +258,7 @@
 	<tr><th>Need</th><th>Use</th><th>Why</th></tr>
 	<tr><td>Editors place and configure it on pages</td><td><b>Fragment</b></td><td>Only fragments live in the page editor sidebar</td></tr>
 	<tr><td>Same markup for every item of a content type, everywhere</td><td><a href="web-content-templates.html">Web Content Template</a></td><td>Belongs to the type, not the page</td></tr>
+	<tr><td>A reusable arrangement of several fragments</td><td>Fragment composition (see <a href="templates.html#formtemplate">Templates</a>)</td><td>Saved from the page editor; no code</td></tr>
 	<tr><td>A real application: state, routing, heavy libraries</td><td><a href="client-extensions.html#customelement">Custom Element CET</a></td><td>Own build pipeline, own lifecycle</td></tr>
 	<tr><td>Behaviour on every page whether or not a fragment is placed</td><td><a href="client-extensions.html#globaljs">globalJS CET</a></td><td>Fragments only run where placed</td></tr>
 	<tr><td>Server-side logic with credentials</td><td><a href="client-extensions.html#microservice">Microservice CET</a></td><td>Fragment JS runs in the visitor's browser as the visitor</td></tr>
@@ -170,30 +271,37 @@
 	<li><a href="templates.html#master">Master pages &mdash; header/footer fragments</a></li>
 	<li><a href="templates.html#display">Display pages &mdash; fragments map to the current item</a></li>
 	<li><a href="web-content.html">Web Content &mdash; what editables map to</a></li>
-	<li><a href="objects.html">Objects &mdash; mapped fields and form inputs</a></li>
+	<li><a href="objects.html">Objects &mdash; mapped fields, actions and form inputs</a></li>
 	<li><a href="theme-design.html">Style books &mdash; the tokens fragment CSS should use</a></li>
+	<li><a href="personalization.html">Experiences &mdash; different fragments per audience</a></li>
 	<li><a href="site-initializers.html">Site initializers &mdash; where fragment source lives</a></li>
 </ul>
 
 <h2 id="sets">Fragment sets (aka fragment collections)</h2>
-<p>Fragments live in named sets, which is just how the sidebar groups them. In an initializer tree the set is the directory under <code>fragments/group/</code> with a <code>collection.json</code>. Group by purpose &mdash; <em>Chrome</em>, <em>Home</em>, <em>Cards</em> &mdash; not by page, because fragments get reused across pages.</p>
+<p>Fragments live in named sets, which is just how the sidebar groups them. In an initializer tree the set is the directory under <code>fragments/group/</code> with a <code>collection.json</code> (<code>name</code>, <code>description</code>). Group by purpose &mdash; <em>Chrome</em>, <em>Home</em>, <em>Cards</em> &mdash; not by page, because fragments get reused across pages.</p>
+<p>A set can also carry a <code>resources/</code> folder. Files there are imported alongside the set and referenced from HTML or CSS as <code>[resources:hero-bg.jpg]</code>, which Liferay rewrites to the stored file's URL &mdash; the clean way to ship a background image or icon with the fragment instead of hard-coding a Documents &amp; Media URL.</p>
 
 <h2>Traps</h2>
 <div class="callout trap">
 	<b>Editing a fragment does not update pages that already use it</b>
-	<p>Liferay <b>copies</b> fragment code into each page's fragment instance at placement time. Changing the source &mdash; in the tree or via the <code>headless-admin-fragment</code> API &mdash; updates the library entry and leaves every existing placement untouched. To apply a fragment change you <a href="site-initializers.html#reprovision">reprovision the site</a>. This surprises everyone exactly once, usually for an afternoon.</p>
+	<p>Liferay <b>copies</b> fragment code into each placement (a <em>fragment entry link</em>) at placement time. Changing the source &mdash; in the tree, in the UI, or via the <code>headless-admin-fragment</code> API &mdash; updates the library entry and leaves every existing placement untouched. That is deliberate: a typo in the library should not rewrite every live page at once.</p>
+	<p>Ways to get the change onto pages: in <b>Design &rarr; Fragments</b>, open the fragment's <b>Usages</b> and <b>Propagate</b>; or, for development only, enable <b>System Settings &rarr; Page Fragments &rarr; Propagate Fragment Changes Automatically</b>; or rebuild the pages from source by <a href="site-initializers.html#reprovision">reprovisioning the site</a>. Built-in (contributed) fragments are the exception &mdash; they always render the current code. This surprises everyone exactly once, usually for an afternoon.</p>
 </div>
 <div class="callout trap">
 	<b>Wrong keys in a page definition render a blank page</b>
 	<p>In <code>page-definition.json</code> a fragment is referenced by <code>key</code> (its directory name) plus <code>siteKey</code> (<code>[$GROUP_KEY$]</code>). Writing <code>collectionExternalReferenceCode</code>/<code>fragmentEntryKey</code> instead is <em>silently dropped</em> &mdash; the page provisions successfully and renders empty. Built-in fragments use a combined key with no siteKey, e.g. <code>BASIC_COMPONENT-paragraph</code>.</p>
 </div>
 <div class="callout warn">
-	<b>Scope your CSS</b>
-	<p>Fragment CSS is injected globally once the fragment is on a page. Prefix selectors (<code>#wrapper .badael-hero …</code>) or use <code>${fragmentEntryLinkNamespace}</code> for per-placement scoping, or your hero will restyle somebody else's card.</p>
+	<b>Fragment CSS is global, and it is not a template</b>
+	<p><code>index.css</code> is emitted as a plain <code>&lt;style&gt;</code> block, once per fragment per page, with no automatic scoping &mdash; your <code>.card</code> rule restyles every <code>.card</code> on the page. FreeMarker does not run in it, so <code>${fragmentEntryLinkNamespace}</code> in CSS stays literal. Prefix every selector with a fragment-specific class (<code>.badael-hero …</code>). For per-placement values, put them on the markup in <code>index.html</code>, e.g. <code>style="--hero-bg: ${configuration.bgColor}"</code>, and read <code>var(--hero-bg)</code> in the CSS.</p>
 </div>
 <div class="callout warn">
 	<b>Fragment JS runs as the visitor</b>
 	<p>Any <code>fetch</code> you write executes with the visitor's session. What returns data for you may return <code>403</code> or an empty list for Guest. See <a href="permissions.html#guest">Guest access</a> before building anything data-driven on a public page.</p>
+</div>
+<div class="callout warn">
+	<b>Editor-mode JS runs too</b>
+	<p>Your script also runs inside the page editor. A carousel that auto-advances, a redirect, or code that removes editable elements will fight the editor. Guard behaviour with <code>layoutMode === 'view'</code>.</p>
 </div>
 		<footer class="pagefoot">
 			Part of the <a href="index.html">Liferay Component Guide</a>.

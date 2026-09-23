@@ -57,44 +57,56 @@
 		<p class="lede">Your own database tables, with a REST API, permissions, relationships, validation and lifecycle logic — defined without writing Java.</p>
 
 <h2>In one sentence</h2>
-<p>An <b>Object</b> is a custom data model. You define fields, relationships and rules; Liferay creates the table, generates a REST API at <code>/o/c/&lt;pluralLabel&gt;</code>, gives you an admin UI, and wires it into <a href="collections.html">collections</a>, <a href="forms.html">forms</a>, <a href="workflow.html">workflow</a>, search and <a href="permissions.html">permissions</a>.</p>
+<p>An <b>Object</b> is a custom data model. You define fields, relationships and rules; Liferay creates the table, generates a REST API at <code>/o/c/&lt;plural of the object name&gt;</code>, gives you an admin UI, and wires it into <a href="collections.html">collections</a>, <a href="forms.html">forms</a>, <a href="workflow.html">workflow</a>, search and <a href="permissions.html">permissions</a>.</p>
 
 <h2>What you get when you publish one</h2>
 <div class="ascii">  Object definition "Policy"
         │
-        ├─▶ a real database table
-        ├─▶ REST: GET/POST/PUT/PATCH/DELETE  /o/c/policies  (+ OData filter, sort, page)
-        ├─▶ an admin application in the Control Panel
+        ├─▶ a real database table (and a second one, &lt;table&gt;_x, for fields added later)
+        ├─▶ REST: GET/POST/PUT/PATCH/DELETE  /o/c/policies  (+ OData filter, sort, page, batch)
+        ├─▶ an admin application in the Control Panel (layouts + views)
         ├─▶ a collection provider (usable in any Collection Display)
         ├─▶ a form target (Form Container binds to it)
         ├─▶ a display page template binding (one URL per entry)
-        ├─▶ permission resources (VIEW / UPDATE / DELETE / ADD_OBJECT_ENTRY)
+        ├─▶ two permission resources (entry: VIEW / UPDATE / DELETE, definition: ADD_OBJECT_ENTRY)
         └─▶ search indexing + workflow support</div>
 <p>That is a lot of platform for one definition, and it is the reason Objects are the default answer for anything that is data rather than prose.</p>
+
+<h3>Draft, then published</h3>
+<p>A definition starts as a <b>draft</b>: nothing exists yet except the metadata. <b>Publishing</b> creates the table, registers the REST application, the permission resources and the admin app. Some choices are frozen at publish time &mdash; the <b>name</b> (and therefore the REST path and the database table), the <b>scope</b>, and the storage type &mdash; so settle them in the draft. Labels can change freely afterwards.</p>
 
 <h2>Fields</h2>
 <div class="wrap"><table>
 	<tr><th><code>businessType</code></th><th>Stores</th><th>Notes</th></tr>
-	<tr><td>Text / LongText / RichText</td><td>Strings</td><td>RichText for editor-authored HTML</td></tr>
-	<tr><td>Integer / LongInteger / Decimal / PrecisionDecimal</td><td>Numbers</td><td>Use PrecisionDecimal for money</td></tr>
+	<tr><td>Text / LongText / RichText</td><td>Strings</td><td>RichText for editor-authored HTML with embedded media</td></tr>
+	<tr><td>Integer / LongInteger / Decimal / PrecisionDecimal</td><td>Numbers</td><td>Use PrecisionDecimal (a <code>BigDecimal</code> column) for money</td></tr>
 	<tr><td>Boolean</td><td>true/false</td><td></td></tr>
 	<tr><td>Date / DateTime</td><td>Dates</td><td>Sortable and filterable</td></tr>
 	<tr><td>Picklist</td><td>A value from a <a href="#picklists">list type definition</a></td><td>Reference by <code>listTypeDefinitionExternalReferenceCode</code></td></tr>
 	<tr><td>MultiselectPicklist</td><td>Several picklist values</td><td></td></tr>
 	<tr><td>Relationship</td><td>A foreign key to another object</td><td>Created by defining a <a href="#relationships">relationship</a>, not by hand</td></tr>
-	<tr><td>Attachment / MultiselectAttachment</td><td><a href="documents-media.html">Document</a> references</td><td></td></tr>
-	<tr><td>Formula</td><td>Computed from other fields</td><td>Evaluated on read</td></tr>
-	<tr><td id="aggregation">Aggregation</td><td>COUNT/SUM/AVG/MIN/MAX over a relationship</td><td>Computed server-side &mdash; see the trap section, this one solves a real problem</td></tr>
-	<tr><td>Encrypted</td><td>Encrypted-at-rest string</td><td></td></tr>
+	<tr><td>Attachment</td><td>One file, stored in <a href="documents-media.html">Documents and Media</a></td><td>100&nbsp;MB default limit; settings decide whether the user uploads from their computer or picks from D&amp;M, and which folder files land in</td></tr>
+	<tr><td>AutoIncrement</td><td>A read-only sequence number</td><td>Configurable start value, prefix and suffix &mdash; the right tool for "REQ-00042" style IDs</td></tr>
+	<tr><td>Formula</td><td>Read-only arithmetic over numeric fields of the same entry</td><td>Computed at runtime, not stored; <b>not indexable</b></td></tr>
+	<tr><td id="aggregation">Aggregation</td><td>COUNT/SUM/AVERAGE/MIN/MAX over a relationship</td><td>Computed server-side, <b>not indexable</b> &mdash; see the trap section, this one solves a real problem</td></tr>
+	<tr><td>Encrypted</td><td>Encrypted-at-rest string</td><td>Off until you configure it &mdash; see below</td></tr>
 </table></div>
+<p>Current docs also list <b>Email Address</b> and <b>Phone Number</b> types. They are not in the 2026.Q2.0 source constants (<code>ObjectFieldConstants</code> there has <code>LargeFile</code> and <code>Assignee</code> instead, which the docs do not list yet), so check the field-type dropdown on your own bundle before you design around any of these four.</p>
 
+<div class="callout note">
+	<b>Encrypted fields need three portal properties</b>
+	<p>Adding an Encrypted field fails with <em>"Business type encrypted is disabled"</em> until <code>portal-ext.properties</code> sets <code>object.encryption.enabled=true</code>, <code>object.encryption.algorithm</code> (e.g. <code>AES</code>) and <code>object.encryption.key</code> (a Base64 key valid for that algorithm). It only works on objects with the default storage type. Encrypted values cannot be searched or filtered &mdash; that is the point &mdash; so do not encrypt anything you will need to query.</p>
+</div>
+
+<h3>Field names</h3>
+<p>Names must start with a lowercase letter and be at most 41 characters. The name is the REST property, the DB column (with a <code>_</code> suffix) and the <code>ObjectField_&lt;name&gt;</code> binding key in <a href="forms.html">forms</a>, so pick it like an API name, not a label.</p>
 <div class="callout trap">
 	<b>Reserved field names roll back the entire site</b>
-	<p><code>status</code>, <code>id</code>, <code>creator</code>, <code>keywords</code>, <code>userId</code> and friends are rejected. <code>name</code>, <code>email</code>, <code>location</code>, <code>company</code> are fine. In a <a href="site-initializers.html">site initializer</a>, a collision throws <code>ObjectFieldNameException$MustNotBeReserved</code>, which <b>aborts initialization and rolls back the whole site transaction</b> &mdash; no site, no objects, no picklists. The symptom reads as "the CET never deployed".</p>
+	<p>The reserved list (from <code>ObjectFieldLocalServiceImpl</code>, compared case-insensitively) is: <code>actions</code>, <code>companyId</code>, <code>createDate</code>, <code>creator</code>, <code>currentDate</code>, <code>dateCreated</code>, <code>dateModified</code>, <code>displayDate</code>, <code>expirationDate</code>, <code>externalReferenceCode</code>, <code>groupId</code>, <code>id</code>, <code>keywords</code>, <code>lastPublishDate</code>, <code>modifiedDate</code>, <code>reviewDate</code>, <code>status</code>, <code>statusByUserId</code>, <code>statusByUserName</code>, <code>statusDate</code>, <code>taxonomyCategoryIds</code>, <code>userId</code>, <code>userName</code>. <code>name</code>, <code>email</code>, <code>location</code>, <code>company</code> are fine. In a <a href="site-initializers.html">site initializer</a>, a collision throws <code>ObjectFieldNameException$MustNotBeReserved</code>, which <b>aborts initialization and rolls back the whole site transaction</b> &mdash; no site, no objects, no picklists. The symptom reads as "the CET never deployed".</p>
 </div>
 
 <h3>State fields</h3>
-<p>Marking a picklist field <code>"state": true</code> turns it into a lifecycle field with a state flow. It then <b>requires</b> a default:</p>
+<p>Marking a picklist field <code>"state": true</code> turns it into a lifecycle field with a state flow (which transitions from which value are allowed). It then <b>requires</b> a default:</p>
 <pre><code>{
 	"businessType": "Picklist",
 	"label": { "en_US": "Status" },
@@ -111,9 +123,13 @@
 	<b>Omitting the default is another silent rollback</b>
 	<p>Without <code>defaultValue</code> + <code>defaultValueType</code> you get <code>ObjectFieldSettingValueException.MissingRequiredValues</code> &mdash; same total rollback as a reserved name. And <code>defaultValue</code> must be an existing picklist <b>entry key</b>; a typo there rolls back too.</p>
 </div>
+<div class="callout note">
+	<b>A state field is not the workflow status</b>
+	<p>Every entry already has a system <code>status</code> (approved, pending, draft&hellip;) owned by <a href="workflow.html#kaleo">workflow</a>. A state picklist is <em>your</em> business lifecycle ("submitted &rarr; in review &rarr; closed"). They are independent: a workflow can approve an entry whose state is still <code>submitted</code>. Decide which one your listings filter on, and do not name your field <code>status</code> &mdash; it is reserved for exactly this reason.</p>
+</div>
 
 <h2 id="picklists">Picklists (list type definitions)</h2>
-<p>A reusable set of key/label options. Define once, reference from any object field.</p>
+<p>A reusable set of key/label options. Define once, reference from any object field. The <b>key</b> is what is stored and what filters match; the <b>name</b> is the translatable label.</p>
 <pre><code>{
 	"externalReferenceCode": "POLICY_STATUS",
 	"listTypeEntries": [
@@ -122,6 +138,7 @@
 	],
 	"name": "Policy Status"
 }</code></pre>
+<p>Over REST a picklist value comes back as an object (<code>{"key": "active", "name": "Active"}</code>); on write, sending just the key is enough.</p>
 <div class="callout trap">
 	<b>Guest cannot read a picklist over REST</b>
 	<p><code>GET /o/headless-admin-list-type/…/list-type-entries</code> returns <b>403</b> for anonymous users, and a company-scope VIEW grant does <em>not</em> lift it. A public <a href="forms.html">form</a> that populates a <code>&lt;select&gt;</code> by fetching the picklist renders it empty; the visitor submits blank and the entry saves looking successful. Ship the options in the fragment markup.</p>
@@ -129,10 +146,11 @@
 
 <h2 id="relationships">Relationships</h2>
 <div class="wrap"><table>
-	<tr><th>Type</th><th>Meaning</th></tr>
-	<tr><td><code>oneToMany</code></td><td>One parent, many children (Event &rarr; Registrations)</td></tr>
-	<tr><td><code>manyToMany</code></td><td>A join table both ways (Employee &harr; Project)</td></tr>
+	<tr><th>Type</th><th>Meaning</th><th>Storage</th></tr>
+	<tr><td><code>oneToMany</code></td><td>One parent, many children (Event &rarr; Registrations)</td><td>An FK column on the child</td></tr>
+	<tr><td><code>manyToMany</code></td><td>Both sides relate to many (Employee &harr; Project)</td><td>A join table; no FK field on either object</td></tr>
 </table></div>
+<p>Those are the only two you can create: the source also defines <code>oneToOne</code>, but relationship validation accepts only <code>oneToMany</code> and <code>manyToMany</code>. For "one-to-one", use one-to-many and enforce the "one" with a validation.</p>
 <pre><code>{
 	"deletionType": "cascade",
 	"externalReferenceCode": "EVENT_REGISTRATIONS",
@@ -143,41 +161,79 @@
 	"objectDefinitionName2": "Registration",
 	"type": "oneToMany"
 }</code></pre>
-<p><code>deletionType</code> is <code>cascade</code>, <code>disassociate</code>, or <code>prevent</code>.</p>
+<div class="wrap"><table>
+	<tr><th><code>deletionType</code></th><th>Deleting the parent&hellip;</th><th>Use when</th></tr>
+	<tr><td><code>prevent</code> (<b>the default</b> if omitted)</td><td>fails while children exist</td><td>Children are valuable records (invoices, submissions)</td></tr>
+	<tr><td><code>cascade</code></td><td>deletes the children too</td><td>Children are meaningless alone (registrations of a cancelled event)</td></tr>
+	<tr><td><code>disassociate</code></td><td>keeps the children, clears their FK</td><td>Children outlive the parent. Liferay also makes the FK field <b>non-required</b>, because it will be empty</td></tr>
+</table></div>
 <div class="callout trap">
 	<b>The foreign key sits on the child but is named for the parent</b>
 	<p>The relationship above creates <code>r_eventRegistrations_c_eventId</code> on <b>Registration</b> &mdash; not <code>…_c_registrationId</code>. Set that key when creating a child over REST. Get it wrong and the unknown key is <b>ignored</b>: the child is created with the FK left at <code>0</code>, and the POST still returns <b>200</b>. There is an ERC twin, <code>r_eventRegistrations_c_eventERC</code>, which is what OData relationship filters need.</p>
 </div>
+<p>Relationships also get their own REST sub-resources on the parent side, which is the only way to link <code>manyToMany</code> entries:</p>
+<pre><code>GET  /o/c/events/{eventId}/eventRegistrations                  # the children
+PUT  /o/c/events/{eventId}/eventRegistrations/{registrationId}  # associate</code></pre>
+<p>Relationships can also cross into <a href="#system-objects">system objects</a> (Account, User&hellip;), which is how you hang your own data off built-in entities.</p>
 
 <h2>Validation and logic</h2>
 <div class="wrap"><table>
 	<tr><th>Mechanism</th><th>Runs</th><th>Use for</th></tr>
 	<tr><td>Required / unique field settings</td><td>On save</td><td>Basic integrity</td></tr>
-	<tr><td>Validation rule (expression)</td><td>Before save</td><td><code>endDate &gt; startDate</code>, format checks</td></tr>
-	<tr><td><a href="client-extensions.html#objectvalidationrule">Validation rule CET</a></td><td>Before save, over HTTP</td><td>Rules needing external data</td></tr>
+	<tr><td>Validation &mdash; <b>Expression Builder</b></td><td>On submission</td><td><code>endDate &gt; startDate</code>, format checks. Works on text, numeric, date and boolean fields. Available everywhere, including SaaS</td></tr>
+	<tr><td>Validation &mdash; <b>Groovy</b></td><td>On submission</td><td>Anything scriptable. Self-hosted/PaaS only, and <b>scripting is disabled by default since 2024.Q3</b> &mdash; same gate as <a href="workflow.html#groovy">Groovy actions</a></td></tr>
+	<tr><td>Validation &mdash; <b>Composite key</b> (2024.Q1+)</td><td>On submission</td><td>"Only one registration per email per event" &mdash; uniqueness over a combination of fields. Cannot add a field that already has data</td></tr>
+	<tr><td><a href="client-extensions.html#objectvalidationrule">Validation rule CET</a></td><td>On submission, over HTTP</td><td>Rules needing external data</td></tr>
 	<tr><td><a href="workflow.html#actions">Object action</a></td><td>onAfterAdd / Update / Delete / standalone</td><td>Notify, create related records, call a webhook</td></tr>
 	<tr><td><a href="workflow.html">Kaleo workflow</a></td><td>On submit</td><td>Multi-step human approval</td></tr>
 </table></div>
+<p>The line to remember: <b>validations can reject a save; actions cannot</b>. Actions run after the commit, so an action that "checks" something is already too late.</p>
 
 <h2>Scope</h2>
 <div class="wrap"><table>
 	<tr><th><code>scope</code></th><th>Behaviour</th><th>Use when</th></tr>
 	<tr><td><code>company</code></td><td>One shared dataset across all sites. <b>Survives site deletion.</b></td><td>Default. Reference data, HR records, anything global.</td></tr>
-	<tr><td><code>site</code></td><td>Per-site data; deleted with the site</td><td>Genuinely site-local content</td></tr>
+	<tr><td><code>site</code></td><td>Per-site data; deleted with the site. REST calls name the site: <code>/o/c/&lt;plural&gt;/scopes/{siteId}</code></td><td>Genuinely site-local content</td></tr>
+	<tr><td><code>depot</code></td><td>Per <a href="documents-media.html">asset library</a></td><td>Newer, CMS-oriented. A depot-scoped object can only relate to other depot-scoped objects</td></tr>
 </table></div>
 <div class="callout good">
 	<b>Why this matters for your workflow</b>
 	<p>Company-scoped objects and their entries survive the delete-and-redeploy cycle that <a href="site-initializers.html#reprovision">page and fragment changes require</a>. So you can iterate on pages all day without losing runtime data.</p>
 </div>
 
+<h2>The admin side: layouts, views, folders</h2>
+<div class="wrap"><table>
+	<tr><th>Piece</th><th>What it controls</th><th>Notes</th></tr>
+	<tr><td><b>Layout</b></td><td>The entry edit form in the admin app: tabs, blocks, field order, and a tab listing related entries</td><td>Only the admin UI. Site visitors see your <a href="forms.html">form</a> and <a href="templates.html#display">display page</a>, never the layout</td></tr>
+	<tr><td><b>View</b></td><td>The entry table in the admin app: columns, default sort, default filters</td><td>Without one you get a generic column set</td></tr>
+	<tr><td><b>Object folder</b></td><td>Groups definitions in the Objects admin and the <b>Model Builder</b> diagram</td><td>Definitions start in <em>Uncategorized</em>. Export a folder to ship several related definitions as one JSON</td></tr>
+	<tr><td><b>Panel link</b></td><td>Where the admin app appears (Control Panel, Site Menu, Applications)</td><td>Company-scoped objects usually go to the Control Panel, site-scoped ones to the Site Menu</td></tr>
+</table></div>
+<p>Per-definition switches worth knowing: <b>entry history</b> (an audit trail per entry), <b>categorization</b> (tags and categories on entries, which is what makes them filterable by <a href="taxonomy.html">taxonomy</a>), <b>comments</b>, and <b>localization</b> (translatable field values).</p>
+
+<h2 id="system-objects">System objects: extending what Liferay already has</h2>
+<p>Several built-in entities are exposed to the Objects framework as <b>system objects</b>: Account, Organization, User, Postal Address, and on Commerce, Order, Product and Product Group. You cannot change their existing fields, but you can <b>add</b> fields, relationships, actions and validations.</p>
+<ul>
+	<li>Added fields live in a side table named after the service table with <code>_x</code> appended (<code>AccountEntry_x</code>), so upgrades never touch them.</li>
+	<li>Relationships to system objects work, but system objects have no custom layouts, so the relationship appears only over headless APIs, not in their admin UI.</li>
+	<li>Postal Address can only relate to custom objects that are themselves related to Account.</li>
+</ul>
+<p>The most useful one on a B2B project is <b>Account</b>: relate your object to it, turn on <b>account restriction</b>, and each entry becomes visible only to users of its account &mdash; row-level security you would otherwise have to build. That is where <a href="permissions.html">account roles</a> come in.</p>
+
 <h2>The REST surface</h2>
 <div class="wrap"><table>
 	<tr><th>Purpose</th><th>Endpoint</th><th>OAuth scope</th></tr>
 	<tr><td>Define objects, fields, relationships, actions</td><td><code>/o/object-admin/v1.0/object-definitions</code></td><td><code>Liferay.Object.Admin.REST.everything</code></td></tr>
-	<tr><td>Read/write entries</td><td><code>/o/c/&lt;pluralLabel&gt;</code></td><td><code>Liferay.Headless.Object.everything</code></td></tr>
+	<tr><td>Read/write entries</td><td><code>/o/c/&lt;plural&gt;</code></td><td>One per object: <code>C_&lt;ObjectName&gt;.everything</code> (e.g. <code>C_Policy.everything</code>)</td></tr>
 </table></div>
+<p>The path is derived from the object's <b>name</b>, not its label: lowercased, then pluralised. <code>Policy</code> &rarr; <code>/o/c/policies</code>, <code>PolicyRequest</code> &rarr; <code>/o/c/policyrequests</code>. Renaming the label never moves the URL; the name cannot change after publish.</p>
 <pre><code>curl --silent --user "test@liferay.com:test" \
-	--url "http://localhost:8080/o/c/policies?filter=policyStatus%20eq%20'active'&amp;sort=title:asc&amp;pageSize=20"</code></pre>
+	--url "http://localhost:8080/o/c/policies?filter=policyStatus%20eq%20'active'&amp;sort=title:asc&amp;pageSize=20"
+
+# address an entry by its stable key instead of its numeric id
+curl --silent --user "test@liferay.com:test" \
+	--url "http://localhost:8080/o/c/policies/by-external-reference-code/POLICY-ANNUAL-LEAVE"</code></pre>
+<p>Prefer <b>external reference codes</b> in anything that crosses environments: ids differ between your laptop and production, ERCs do not. Each object also has a <code>/batch</code> endpoint for bulk import.</p>
 
 <h2>How it connects</h2>
 <ul class="rel">
@@ -192,10 +248,14 @@
 </ul>
 
 <h2>Traps</h2>
+<div class="callout trap">
+	<b>A new object is invisible to everyone but its admins</b>
+	<p>The generated resource actions have empty <code>guest-defaults</code> <em>and</em> empty <code>site-member-defaults</code>. So after publishing, neither visitors nor ordinary signed-in users can read entries until you grant VIEW. The creator of an entry can still see it (the Owner role), which is why "I can see my test entry" proves nothing. See <a href="permissions.html#guest">Guest access</a>.</p>
+</div>
 <div class="callout trap" id="guest-count">
 	<b>Never count object entries in the browser on a public page</b>
 	<p>A public form's object is typically write-only for Guest: <code>ADD_OBJECT_ENTRY</code> granted, <code>VIEW</code> deliberately not (company-scope VIEW would publish every submitter's name and email). So <code>GET /o/c/&lt;plural&gt;</code> returns <code>200</code> with <code>totalCount: 0</code> for the visitor, and "500 of 500 seats" renders as "0 of 500".</p>
-	<p>Fix it with an <b>Aggregation field</b> (<code>businessType: Aggregation</code>, <code>function: COUNT</code>) on the parent object. Aggregations are computed server-side and <b>ignore entry-level permissions</b>, so Guest gets the right number without being able to read a single submission. It serializes as a <b>string</b> &mdash; parse before arithmetic.</p>
+	<p>Fix it with an <b>Aggregation field</b> (<code>businessType: Aggregation</code>, <code>function: COUNT</code>) on the parent object. Aggregations are computed server-side and <b>ignore entry-level permissions</b>, so Guest gets the right number without being able to read a single submission. It serializes as a <b>string</b> &mdash; parse before arithmetic. And because aggregations are not indexed, you cannot sort or filter a listing by them.</p>
 </div>
 <div class="callout good">
 	<b>The submission POST does return the entry</b>
@@ -208,6 +268,10 @@
 <div class="callout warn">
 	<b>Publish before you reference</b>
 	<p><code>[$OBJECT_DEFINITION_ID:Name$]</code> and <code>[$OBJECT_DEFINITION_CLASS_NAME:Name$]</code> tokens resolve for every <b>published</b> object in the company &mdash; including ones created live outside the tree. A draft definition registers no token, and the file referencing it fails to parse.</p>
+</div>
+<div class="callout warn">
+	<b>Workflow changes what "created" means</b>
+	<p>Once a <a href="workflow.html#kaleo">workflow</a> is attached to the object, a successful POST creates an entry with status <em>pending</em>, not approved. Listings, collections and non-owners will not see it until someone approves. The POST body's <code>status</code> tells you which case you are in.</p>
 </div>
 		<footer class="pagefoot">
 			Part of the <a href="index.html">Liferay Component Guide</a>.

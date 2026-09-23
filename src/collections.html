@@ -38,14 +38,26 @@
 	<p>A collection is a site-level entity, not a page setting. Define "Latest News" once and place it on the homepage, the news index, and a sidebar &mdash; three placements, one definition, one place to change the rules.</p>
 </div>
 
+<h3 id="variations">Personalized variations</h3>
+<p>A collection can have <b>variations per <a href="personalization.html">segment</a></b>: "Latest News" shows HR items to the HR segment and everything to everyone else, from the same placement. This is the cheapest form of personalisation Liferay has &mdash; one page, one Collection Display, no <a href="personalization.html">experience</a> to maintain &mdash; and it should be your first thought before a whole alternative page composition.</p>
+
+<h3>Collections in an initializer</h3>
+<p>Asset List collections come from <code>asset-list-entries.json</code>. The handler derives each collection's key from its <code>title</code> (lower-cased, spaces to hyphens) and publishes the numeric ID as a token, so a page definition references "Latest News" like this:</p>
+<pre><code>"collectionConfig": {
+	"collectionType": "Collection",
+	"collectionReference": { "classPK": "[$ASSET_LIST_ENTRY_ID:LATEST-NEWS$]" }
+}</code></pre>
+<p>Asset List collections are referenced by <code>classPK</code>; collection providers (below) by <code>className</code>. Mixing them up &mdash; <code>className</code> on a <code>"Collection"</code> &mdash; resolves to nothing and the display renders empty.</p>
+
 <h2>Collection Display &mdash; what you configure</h2>
 <div class="wrap"><table>
 	<tr><th>Setting</th><th>Effect</th></tr>
-	<tr><td><code>numberOfItems</code></td><td>How many to show (and whether to cap at the collection's own limit)</td></tr>
-	<tr><td><code>numberOfColumns</code></td><td>Grid width</td></tr>
-	<tr><td><code>paginationType</code></td><td>None, numeric, or "load more"</td></tr>
-	<tr><td>Display &mdash; item template</td><td>Either a <a href="web-content-templates.html">Web Content Template</a>, or fragments you compose per item</td></tr>
-	<tr><td>List style</td><td>Grid, list, or a fragment-based layout</td></tr>
+	<tr><td><code>numberOfItems</code></td><td>How many items in total (<code>displayAllItems</code> removes the cap)</td></tr>
+	<tr><td><code>numberOfItemsPerPage</code></td><td>Page size when paginated</td></tr>
+	<tr><td><code>numberOfColumns</code></td><td>Grid width (overridable per viewport)</td></tr>
+	<tr><td><code>paginationType</code></td><td><code>None</code>, <code>Numeric</code> (page numbers; <code>Regular</code> is an alias), or <code>Simple</code> (previous/next). There is no "load more".</td></tr>
+	<tr><td><code>listStyle</code> / <code>templateKey</code></td><td>Fragments you compose per item (the default), a registered list renderer, or a template such as a <a href="web-content-templates.html">Web Content Template</a></td></tr>
+	<tr><td><code>emptyCollectionConfig</code></td><td>The message shown when there are no items &mdash; set one, so "empty" and "broken" look different</td></tr>
 </table></div>
 
 <h3>The per-item template</h3>
@@ -58,7 +70,8 @@
 		},
 		"numberOfItems": 6,
 		"numberOfColumns": 3,
-		"paginationType": "numeric"
+		"numberOfItemsPerPage": 6,
+		"paginationType": "Numeric"
 	},
 	"type": "Collection",
 	"pageElements": [
@@ -82,18 +95,23 @@
 		}
 	]
 }</code></pre>
-<p>Two details do the real work: <code>fieldKey</code> is <code>ObjectField_&lt;name&gt;</code> for an <a href="objects.html">Object</a> field, and <code>contextSource: "CollectionItem"</code> is what makes the mapping resolve per row instead of per page.</p>
+<p>Two details do the real work: <code>fieldKey</code> is <code>ObjectField_&lt;name&gt;</code> for an <a href="objects.html">Object</a> field, and <code>contextSource: "CollectionItem"</code> is what makes the mapping resolve per row instead of per page. The per-row fragment is an ordinary <a href="fragments.html">fragment</a>; the same card can be mapped to a fixed article elsewhere.</p>
+<div class="callout trap">
+	<b><code>paginationType</code> is case-sensitive, and a wrong value is dropped</b>
+	<p>The importer compares against the enum values <code>None</code>/<code>Numeric</code>/<code>Regular</code>/<code>Simple</code> exactly. <code>"numeric"</code> matches nothing, pagination is stored as null, and the display silently renders with no pagination at all. Same family of bug as the <a href="fragments.html">fragment key</a> trap: valid JSON, wrong value, no error.</p>
+</div>
 
 <h2>Collection filters</h2>
-<p>Drop <b>Collection Filter</b> fragments above a Collection Display and visitors can narrow it themselves &mdash; by category, tag, or a custom filter. The filter fragment must sit on the same page and targets the display by ID.</p>
-<p>For a bespoke filter UI, an <a href="client-extensions.html#fdsfilter"><code>fdsFilter</code> CET</a> covers Frontend Data Set tables; for collections, a custom filter fragment plus query params is the usual route.</p>
+<p>Drop a <b>Collection Filter</b> fragment on the same page as a Collection Display, point it at that display in its configuration, and visitors can narrow the list themselves &mdash; by keyword, <a href="taxonomy.html">category</a>, or tag. Add an <b>Applied Filters</b> fragment to show (and clear) what is active. Filter state lives in the URL, so a filtered view is bookmarkable and shareable.</p>
+<p>Not every source can be filtered: the filter only offers the collections whose provider supports that filter type, and a custom provider has to opt in. For a bespoke filter UI, an <a href="client-extensions.html#fdsfilter"><code>fdsFilter</code> CET</a> covers Frontend Data Set tables; for collections, a custom filter fragment plus query params is the usual route.</p>
 
 <h2 id="providers">Collection providers</h2>
 <p>When neither a manual list nor a query expresses what you need &mdash; "the 5 policies this user has not acknowledged", "items from an external API" &mdash; a <b>Collection Provider</b> supplies items programmatically. It appears in the collection picker like any other collection.</p>
 <div class="wrap"><table>
 	<tr><th>Source</th><th>How</th><th>Notes</th></tr>
 	<tr><td>Liferay Object</td><td>Built in &mdash; every published <a href="objects.html">object</a> is offered as a collection provider</td><td>No code. This is the common case.</td></tr>
-	<tr><td>Custom logic</td><td><code>InfoCollectionProvider</code> in an <a href="widgets-modules.html">OSGi module</a></td><td>Self-hosted only; needs a deploy</td></tr>
+	<tr><td>"Related to this item"</td><td>Built in &mdash; related-item providers (e.g. items sharing the current item's categories, or an object relationship)</td><td>Use on a <a href="templates.html#display">display page</a>, where there is a current item to relate to</td></tr>
+	<tr><td>Custom logic</td><td><code>InfoCollectionProvider</code> (or <code>RelatedInfoItemCollectionProvider</code>) in an <a href="widgets-modules.html">OSGi module</a></td><td>Self-hosted only; needs a deploy. Referenced by its class name in <code>collectionReference.className</code>.</td></tr>
 	<tr><td>External data</td><td>An <a href="client-extensions.html#objectentrymanager">Object Entry Manager CET</a> behind an object</td><td>Preferred &mdash; the object then works as a normal collection source</td></tr>
 </table></div>
 
@@ -130,7 +148,7 @@
 </div>
 <div class="callout warn">
 	<b>Page composition changes need a reprovision</b>
-	<p>Adding or rearranging a Collection Display on an <em>existing</em> page is not picked up by re-triggering a <a href="site-initializers.html">site initializer</a>. Pages are upserted, compositions are not retrofitted &mdash; delete the site and redeploy.</p>
+	<p>Adding or rearranging a Collection Display on an <em>existing</em> page is not picked up by redeploying a <a href="site-initializers.html">site initializer</a>, which only runs at site creation &mdash; delete the site and redeploy. See <a href="pages.html">Pages</a> for what the initializer does if it is re-run against an existing site.</p>
 </div>
 <div class="callout warn">
 	<b>Do not compute totals in the browser on public pages</b>

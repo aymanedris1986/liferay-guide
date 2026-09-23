@@ -102,10 +102,20 @@
 	</tr>
 	<tr>
 		<td><b>Structure</b></td>
-		<td>A Content Structure (fields for a web content article); <em>or</em> an Object definition (fields for a database record); <em>or</em> a Document Type / Metadata Set.</td>
+		<td>A Content Structure (fields for a web content article, the classic DDM kind); <em>or</em> an Object definition (fields for a database record); <em>or</em> a Document Type / Metadata Set; <em>or</em>, in the new object-based CMS (see below), a "content structure" that is really an Object definition underneath.</td>
 		<td><a href="content-structures.html">Content Structures</a> vs <a href="objects.html">Objects</a></td>
 	</tr>
 </table></div>
+
+<h2 id="two-cms">Two CMSes in 2026: classic and new</h2>
+<p>You need to know about this before you read anything else. Since 2025.Q4 Liferay has been shipping a <b>second</b> content management system next to the one this guide mostly covers:</p>
+<div class="wrap"><table>
+	<tr><th></th><th>Classic CMS (this guide's default)</th><th>New "headless" CMS</th></tr>
+	<tr><td>Storage</td><td>Journal articles + DDM structures (<a href="web-content.html">Web Content</a>, <a href="content-structures.html">Content Structures</a>)</td><td>Built on <a href="objects.html">Objects</a>: content structures are object definitions, content items are object entries</td></tr>
+	<tr><td>Organisation</td><td>Sites, folders, Asset Libraries</td><td><b>Spaces</b></td></tr>
+	<tr><td>Status</td><td>Supported, but in <b>maintenance mode since 2026.Q1</b>: fixes continue, new features go to the new CMS</td><td>Beta in 2025.Q4 and released behind the <code>CMS</code> feature flag (LPD-17564) in 2026.Q1. GA without a flag only from <b>2026.Q3</b></td></tr>
+</table></div>
+<p>On <b>2026.Q2</b>, which this workspace runs, the new CMS is off unless someone enables the flag. Liferay's position is that the two run in parallel and classic sites keep working. Build Badael on the classic stack unless there is a deliberate decision to adopt the new one, and don't mix the two for the same content type. A trap to watch for: search results and learn.liferay.com now often show the new CMS's "Content Structures" pages first, and their field settings (ERC, Mandatory, picklists, "Select Related Content") are <em>not</em> the classic structure builder's.</p>
 
 <h2>Start where your question is</h2>
 <div class="cards">
@@ -136,7 +146,7 @@
 
 <h2>How to regenerate these pages</h2>
 <p>Page bodies live in <code>src/</code>; the shared shell (head, nav, footer) is applied by <code>build.sh</code>. Edit a body, then:</p>
-<pre><code>cd docs/liferay-guide
+<pre><code>cd liferay-guide    # the folder that contains build.sh
 bash build.sh</code></pre>
 <p>Adding a page means dropping <code>src/&lt;slug&gt;.html</code> (first two lines are <code>&lt;!--title: …--&gt;</code> and <code>&lt;!--subtitle: …--&gt;</code>) and adding one line to the <code>PAGES</code> array in <code>build.sh</code>.</p>
 		<footer class="pagefoot">

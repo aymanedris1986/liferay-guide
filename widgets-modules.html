@@ -59,11 +59,12 @@
 <h2>The vocabulary</h2>
 <div class="wrap"><table>
 	<tr><th>Term</th><th>Means</th></tr>
-	<tr><td><b>Portlet</b></td><td>The Java standard for a self-contained web component with its own request lifecycle</td></tr>
-	<tr><td><b>Widget</b></td><td>What Liferay calls a portlet in the UI &mdash; the things in the "Add" sidebar</td></tr>
+	<tr><td><b>Portlet</b></td><td>The Java standard for a self-contained web component with its own request lifecycle (render, action, resource phases)</td></tr>
+	<tr><td><b>Widget</b></td><td>What Liferay calls a portlet in the UI &mdash; the things in the "Add" sidebar. Custom-element and iframe <a href="client-extensions.html#customelement">CETs</a> also show up here, registered as portlets.</td></tr>
 	<tr><td><b>OSGi module</b></td><td>A JAR deployed <em>into</em> Liferay's JVM. May contain portlets, services, overrides, listeners</td></tr>
+	<tr><td><b>OSGi component</b></td><td>A class annotated <code>@Component</code> that the module registers in the service registry. This is how almost everything in Liferay is wired: you publish a service under an interface, and Liferay picks it up.</td></tr>
 	<tr><td><b>Service Builder</b></td><td>Liferay's code generator for persistence layers in a module</td></tr>
-	<tr><td><b>WAR</b></td><td>The older packaging; themes and some legacy apps</td></tr>
+	<tr><td><b>WAR</b></td><td>The older packaging; themes and some legacy apps. Converted to an OSGi bundle on deploy.</td></tr>
 </table></div>
 
 <h2>Built-in widgets you will actually use</h2>
@@ -85,31 +86,78 @@
 </div>
 
 <h2>When a custom OSGi module is genuinely required</h2>
+<p>The rule of thumb: if the requirement is "react to or change what Liferay does <em>inside</em> a request or transaction", and the thing you are hooking is not an <a href="objects.html">Object</a>, you are in module territory.</p>
 <div class="wrap"><table>
 	<tr><th>Requirement</th><th>Why a CET cannot do it</th></tr>
 	<tr><td>A custom <a href="collections.html#providers">InfoCollectionProvider</a></td><td>The interface is registered in the OSGi registry; there is no CET equivalent</td></tr>
-	<tr><td>A custom indexer or search post-processor</td><td>Runs inside the search pipeline</td></tr>
+	<tr><td>A custom indexer contributor or search post-processor</td><td>Runs inside the search pipeline</td></tr>
 	<tr><td>A Model Listener reacting to core entities (User, Layout)</td><td>Only <a href="objects.html">Objects</a> expose lifecycle hooks to CETs</td></tr>
-	<tr><td>Overriding a Liferay service implementation</td><td>Requires being in the same OSGi registry</td></tr>
+	<tr><td>Overriding a Liferay service implementation (a <em>service wrapper</em>)</td><td>Requires being in the same OSGi registry and the same transaction</td></tr>
+	<tr><td>A custom <a href="permissions.html">model resource permission</a> &mdash; permission logic the role system cannot express</td><td>Permission checks run synchronously in-process</td></tr>
 	<tr><td>A custom authentication or auto-login verifier</td><td>Part of the request pipeline</td></tr>
 	<tr><td>Service Builder persistence for complex Java domain logic</td><td>Objects cover most of this; genuinely complex domains occasionally do not</td></tr>
 	<tr><td>A custom portlet with server-side render lifecycle</td><td>Custom Elements render client-side</td></tr>
 </table></div>
+<div class="callout note">
+	<b>A real example from this project</b>
+	<p>Badael's one module, <code>com.badael.intranet.content.permission</code>, is an <code>ObjectEntryLocalServiceWrapper</code> plus a <code>ModelResourcePermission</code> registrar. It exists because the permission rule needs to run <em>inside</em> every object-entry permission check &mdash; something no object action or validation CET can do, because those run after the fact or only on save. That is what "genuinely required" looks like: narrow, written down, and not a UI.</p>
+</div>
 
 <h2>The real cost</h2>
 <div class="wrap"><table>
 	<tr><th></th><th><a href="client-extensions.html">Client Extension</a></th><th>OSGi module</th></tr>
 	<tr><td>Runs</td><td>Outside the JVM (or just in the browser)</td><td>Inside Liferay's JVM</td></tr>
 	<tr><td>Works on SaaS</td><td>Yes</td><td><b>No</b></td></tr>
-	<tr><td>Upgrade impact</td><td>Minimal &mdash; it talks to versioned REST APIs</td><td>Re-compile and re-test against each release</td></tr>
+	<tr><td>Upgrade impact</td><td>Minimal &mdash; it talks to versioned REST APIs</td><td>Re-compile and re-test against each release; internal APIs change without notice</td></tr>
 	<tr><td>A bug can take down the portal</td><td>No</td><td><b>Yes</b> &mdash; same heap, same threads</td></tr>
 	<tr><td>Language</td><td>Anything</td><td>Java</td></tr>
 	<tr><td>Deploy cadence</td><td>Independent</td><td>Coupled to the portal</td></tr>
-	<tr><td>Local build</td><td><code>blade gw deploy</code></td><td><code>blade gw deploy</code> + bundle restart in many cases</td></tr>
+	<tr><td>Local build</td><td><code>blade gw deploy</code></td><td><code>blade gw deploy</code>; hot-deploys, but bundles that depend on yours are refreshed with it</td></tr>
 </table></div>
 <div class="callout warn">
 	<b>The decision is mostly about SaaS and upgrades</b>
-	<p>One OSGi module in the estate means the whole system is self-hosted and every quarterly release is a regression cycle. That is sometimes the right call. It should never be an accidental one.</p>
+	<p>One OSGi module in the estate means the whole system is self-hosted (or PaaS) and every quarterly release is a regression cycle. That is sometimes the right call. It should never be an accidental one.</p>
+</div>
+
+<h2>What a portlet looks like in 2026.Q2</h2>
+<p>An MVC portlet is a class extending <code>MVCPortlet</code>, published as an OSGi component. Its "descriptor" is the component properties &mdash; there is no <code>portlet.xml</code>.</p>
+<pre><code>package com.badael.leave.web.internal.portlet;
+
+import com.liferay.portal.kernel.portlet.bridges.mvc.MVCPortlet;
+
+import jakarta.portlet.Portlet;
+
+import org.osgi.service.component.annotations.Component;
+
+@Component(
+	property = {
+		"com.liferay.portlet.display-category=category.badael",
+		"jakarta.portlet.display-name=Leave Balance",
+		"jakarta.portlet.init-param.view-template=/view.jsp",
+		"jakarta.portlet.name=com_badael_leave_web_LeaveBalancePortlet",
+		"jakarta.portlet.resource-bundle=content.Language",
+		"jakarta.portlet.security-role-ref=power-user,user"
+	},
+	service = Portlet.class
+)
+public class LeaveBalancePortlet extends MVCPortlet {
+}</code></pre>
+<p>Beyond the trivial case you split logic into separate components &mdash; <code>MVCRenderCommand</code>, <code>MVCActionCommand</code>, <code>MVCResourceCommand</code> &mdash; each registered with <code>jakarta.portlet.name</code> pointing at the portlet and an <code>mvc.command.name</code>. That keeps the portlet class empty and each command independently testable.</p>
+<div class="callout trap">
+	<b>It is <code>jakarta.portlet</code> now, not <code>javax.portlet</code></b>
+	<p>This DXP line runs on Jakarta EE: the portal ships <code>com.liferay.jakarta.portlet-api</code>, and its own portlets are registered with <code>jakarta.portlet.name</code>, <code>jakarta.portlet.display-name</code> and friends. Code, JSP imports, and component property names copied from older tutorials (<code>javax.portlet.*</code>, <code>javax.servlet.*</code>) need migrating. A module that still imports <code>javax.portlet</code> typically sits in <code>INSTALLED</code> with an unresolved package requirement.</p>
+</div>
+
+<h2>Service Builder, briefly</h2>
+<p>Service Builder generates a persistence layer, local and remote services, and model classes from a <code>service.xml</code>. It produces two modules: <code>*-api</code> (interfaces, exported) and <code>*-service</code> (implementation, private).</p>
+<pre><code>blade create -t service-builder -p com.badael.leave badael-leave
+# edit badael-leave-service/service.xml, then:
+cd modules/badael-leave &amp;&amp; blade gw buildService
+blade gw deploy</code></pre>
+<p>You write business logic only in the generated <code>*LocalServiceImpl</code>; everything else is regenerated on each <code>buildService</code>. Upgrade steps for schema changes are your job (an <code>UpgradeStepRegistrator</code>).</p>
+<div class="callout warn">
+	<b>Before reaching for Service Builder, check Objects</b>
+	<p><a href="objects.html">Objects</a> give you tables, a REST and GraphQL API, permissions, workflow, and admin UI, with no code and no upgrade process. Service Builder wins only when you need real Java domain logic in the same transaction, complex queries Objects cannot express, or an existing SB codebase. A new SB entity on a SaaS-bound project is a contradiction.</p>
 </div>
 
 <h2>Workspace layout</h2>
@@ -117,14 +165,19 @@
 themes/             legacy theme WARs       (liferay.workspace.themes.dir)
 client-extensions/  CETs                    ← start here
 configs/            per-environment properties: common, local, dev, uat, prod, docker
-bundles/            the Tomcat install + deployed artifacts (not in git)</div>
-<pre><code>blade gw deploy                       # build and deploy the current project
-blade gw tasks                        # what is available
-blade server start --tail             # start Tomcat and follow the log</code></pre>
-<p>Deployed artifacts land in <code>bundles/osgi/modules</code> and <code>bundles/osgi/client-extensions</code>; logs in <code>bundles/tomcat*/logs/catalina.out</code> and <code>bundles/logs/liferay.&lt;date&gt;.log</code>.</p>
+bundles/            the Tomcat install + deployed artifacts (not in git)
+gradle.properties   liferay.workspace.product=dxp-2026.q2.11   ← the DXP version everything compiles against</div>
+<pre><code>blade init -v dxp-2026.q2.11 badael       # new workspace pinned to a product
+blade gw initBundle                       # download/unpack the bundle into bundles/
+blade create -t mvc-portlet -p com.badael.leave.web -c LeaveBalancePortlet badael-leave-web
+blade gw deploy                           # build and deploy the current project
+blade gw tasks                            # what is available
+blade server start --tail                 # start Tomcat and follow the log
+blade sh lb | grep badael                 # Gogo shell: list bundles and their state</code></pre>
+<p>Modules compile against <code>release.dxp.api</code> (declared <code>compileOnly</code> with no version &mdash; the workspace product supplies it), so bumping <code>liferay.workspace.product</code> is how you move every module to a new quarterly release in one place. Deployed artifacts land in <code>bundles/osgi/modules</code> and <code>bundles/osgi/client-extensions</code>; logs in <code>bundles/tomcat/logs/catalina.out</code> and <code>bundles/logs/liferay.&lt;date&gt;.log</code>.</p>
 <div class="callout warn">
 	<b>Success is <code>STARTED</code> in the log, not a green build</b>
-	<p>A module can build, deploy, and sit in <code>INSTALLED</code> or <code>RESOLVED</code> forever because of an unsatisfied dependency, with no error on the console you were watching.</p>
+	<p>A module can build, deploy, and sit in <code>INSTALLED</code> or <code>RESOLVED</code> forever because of an unsatisfied dependency, with no error on the console you were watching. In the Gogo shell, <code>diag &lt;bundle-id&gt;</code> names the missing package; <code>scr:info &lt;component&gt;</code> tells you why a component that is in a started bundle is still not active (usually an unsatisfied <code>@Reference</code>).</p>
 </div>
 
 <h2>How it connects</h2>
@@ -134,6 +187,7 @@ blade server start --tail             # start Tomcat and follow the log</code></
 	<li><a href="templates.html#adt">ADTs &mdash; restyling widget output</a></li>
 	<li><a href="collections.html#providers">Collection providers &mdash; a legitimate module use case</a></li>
 	<li><a href="objects.html">Objects &mdash; what replaced most Service Builder work</a></li>
+	<li><a href="permissions.html">Permissions &mdash; where a custom permission module plugs in</a></li>
 	<li><a href="theme-design.html">Themes &mdash; the WAR-to-CET migration</a></li>
 </ul>
 
@@ -145,6 +199,10 @@ blade server start --tail             # start Tomcat and follow the log</code></
 	<li>Can a <a href="client-extensions.html">CET</a> do it? &rarr; done, and it survives upgrades.</li>
 	<li>Only then: an OSGi module &mdash; and write down why, because the next person will ask.</li>
 </ol>
+<div class="callout trap">
+	<b>A new React portlet is almost always the wrong shape</b>
+	<p>If the reason for a module is "I need a React UI as a widget", that is exactly what a <a href="client-extensions.html#customelement"><code>customElement</code> CET</a> is for. It gets you the widget, the page placement and the configuration, without the JVM.</p>
+</div>
 		<footer class="pagefoot">
 			Part of the <a href="index.html">Liferay Component Guide</a>.
 			Not sure which component fits? Start at <a href="decision-guide.html">What should I use?</a>

@@ -1,5 +1,5 @@
 <!--title: Pages & page types-->
-<!--subtitle: Where everything else ends up. Five page types, three vocabularies for the word "type", and the composition tree that a page definition actually is.-->
+<!--subtitle: Where everything else ends up. The page types that matter, several vocabularies for the word "type", and the composition tree that a page definition actually is.-->
 
 <h2>In one sentence</h2>
 <p>A <b>page</b> is a URL in a site's navigation tree, with a type that decides how its body is produced &mdash; composed from <a href="fragments.html">fragments</a>, filled with <a href="widgets-modules.html">widgets</a>, or pointed somewhere else entirely.</p>
@@ -8,22 +8,40 @@
 <div class="wrap"><table>
 	<tr><th>Type</th><th>What it is</th><th>Use for</th></tr>
 	<tr><td><b>Content Page</b></td><td>Fragment-composed layout, edited in the page editor. The default.</td><td>Everything, unless you have a specific reason not to</td></tr>
-	<tr><td><b>Widget Page</b></td><td>Legacy portlet layout with column templates</td><td>Old portlet apps; compatibility only</td></tr>
+	<tr><td><b>Collection Page</b></td><td>A content page created already bound to a <a href="collections.html">collection</a></td><td>Index pages ("All news"); it is still a content page underneath</td></tr>
+	<tr><td><b>Widget Page</b></td><td>Legacy portlet layout with column templates</td><td>Old portlet apps; compatibility only. Deprecated from 2026.Q3.</td></tr>
+	<tr><td><b>Page Set</b></td><td>A node that groups child pages but is not itself a page</td><td>Navigation grouping ("About &rarr; &hellip;")</td></tr>
+	<tr><td><b>Link to a Page of This Site</b></td><td>A node that points at another page</td><td>Showing one page in two places in the menu</td></tr>
 	<tr><td><b>Link to URL</b></td><td>A navigation node that redirects</td><td>External links inside the menu</td></tr>
 	<tr><td><b>Embedded</b></td><td>An iframe to an external URL, inside your chrome</td><td>Wrapping a third-party tool</td></tr>
-	<tr><td><b>Full Page Application</b></td><td>One widget occupying the whole page, own URL space</td><td>An app-like experience</td></tr>
+	<tr><td><b>Full Page Application</b> / <b>Panel</b></td><td>One widget filling the page / a menu of widgets shown one at a time</td><td>Nothing new &mdash; both deprecated from 2026.Q3 with no automatic migration</td></tr>
 </table></div>
 
+<div class="callout note">
+	<b>Deprecations to plan around (as of 2026.Q2)</b>
+	<p><b>Private pages</b> are deprecated since 2024.Q4 and disabled by default on new installations &mdash; design public pages plus <a href="permissions.html">permissions</a> instead. In <b>2026.Q3</b> the Widget Page, Full Page Application, Panel and Widget Page Template types are deprecated behind feature flag <code>LPD-76864</code> (off on new installs), and newer <code>BundleSiteInitializer</code> code already <em>skips</em> a widget <code>page.json</code> when that flag is off. On 2026.Q2 they still work, but nothing you build today should depend on them.</p>
+</div>
+
+<h3>Pages that are not in the navigation tree</h3>
+<div class="wrap"><table>
+	<tr><th>Thing</th><th>What it is</th><th>Where it lives</th></tr>
+	<tr><td><a href="templates.html#master">Master page</a></td><td>The chrome (header, footer) around a content page, with one drop zone for the page body</td><td>Design &rarr; Page Templates &rarr; Masters</td></tr>
+	<tr><td><a href="templates.html#pagetemplate">Page template</a></td><td>A starting layout copied into a new page. Copied, not linked &mdash; later template edits do not reach existing pages.</td><td>Design &rarr; Page Templates</td></tr>
+	<tr><td><a href="templates.html#display">Display page template</a></td><td>One layout rendered for <em>every</em> item of a type, at the item's own URL</td><td>Design &rarr; Page Templates &rarr; Display Page Templates</td></tr>
+	<tr><td>Utility page</td><td>A content page for a system job: 404, 500, sign-in, create account, forgot password, cookie policy</td><td>Design &rarr; Utility Pages; <code>layout-utility-page-entries/</code> in an initializer</td></tr>
+</table></div>
+<p>All four are edited in the same page editor with the same fragments, which is why "a page" in Liferay conversations can mean any of them.</p>
+
 <div class="callout warn">
-	<b>Three "type" vocabularies &mdash; do not mix them</b>
-	<p>The internal layout key is <code>content</code>/<code>portlet</code>/<code>url</code>/<code>embedded</code>. The <code>headless-admin-site</code> API enum is <code>ContentPage</code>/<code>WidgetPage</code>/<code>LinkToURLPage</code>/<code>EmbeddedPage</code>/<code>PageSetPage</code>/<code>LinkToPagePage</code>. A <a href="site-initializers.html">site initializer</a> <code>page.json</code> uses <code>Content</code>/<code>Portlet</code>/<code>URL</code>/<code>Embedded</code>. And <code>headless-delivery</code> has its own <code>pageType</code> field. Copying a value from the wrong table is a 400 at best and a wrong page type at worst.</p>
+	<b>Several "type" vocabularies &mdash; do not mix them</b>
+	<p>The internal layout key is <code>content</code>/<code>portlet</code>/<code>url</code>/<code>embedded</code>/<code>link_to_layout</code>/<code>node</code> (page set)/<code>utility</code>. The <code>headless-admin-site</code> API enum is <code>ContentPage</code>/<code>WidgetPage</code>/<code>LinkToURLPage</code>/<code>EmbeddedPage</code>/<code>PageSetPage</code>/<code>LinkToPagePage</code>. A <a href="site-initializers.html">site initializer</a> <code>page.json</code> takes <code>Content</code>/<code>Portlet</code>/<code>URL</code>/<code>Embedded</code> &mdash; lower-cased before use, with <code>widget</code> and <code>link_to_layout</code> accepted as aliases. And <code>headless-delivery</code> has its own <code>pageType</code> field. Copying a value from the wrong table is a 400 at best and a wrong page type at worst.</p>
 </div>
 
 <h2>Public vs private, hidden vs visible</h2>
 <div class="wrap"><table>
 	<tr><th>Flag</th><th>Meaning</th></tr>
 	<tr><td><code>private: false</code></td><td>In the public page set. Still needs a Guest VIEW grant to actually be public &mdash; see <a href="permissions.html">Permissions</a>.</td></tr>
-	<tr><td><code>private: true</code></td><td>In the private page set; requires site membership.</td></tr>
+	<tr><td><code>private: true</code></td><td>In the private page set; requires site membership. Deprecated since 2024.Q4 and off by default on new installs &mdash; avoid.</td></tr>
 	<tr><td><code>hidden: true</code></td><td>Reachable by URL, omitted from navigation. Used for display-page hosts and thank-you pages.</td></tr>
 </table></div>
 
@@ -32,26 +50,34 @@
 <div class="wrap"><table>
 	<tr><th>Element type</th><th>Role</th></tr>
 	<tr><td><code>Root</code></td><td>The top of the tree</td></tr>
-	<tr><td><code>Section</code></td><td>A layout band: columns, spacing, background</td></tr>
-	<tr><td><code>Row</code> / <code>ColumnDefinition</code></td><td>Grid structure inside a section</td></tr>
+	<tr><td><code>Section</code></td><td>A container: spacing, background, width (the editor's <em>Container</em>)</td></tr>
+	<tr><td><code>Row</code> / <code>Column</code></td><td>Grid structure (the editor's <em>Grid</em>)</td></tr>
 	<tr><td><code>Fragment</code></td><td>A <a href="fragments.html">fragment</a> placement, by <code>key</code> + <code>siteKey</code></td></tr>
 	<tr><td><code>Widget</code></td><td>A portlet embedded in a content page</td></tr>
 	<tr><td><code>Collection</code></td><td>A <a href="collections.html">Collection Display</a>, bound via <code>collectionConfig</code></td></tr>
 	<tr><td><code>CollectionItem</code></td><td>The per-row template inside a Collection</td></tr>
 	<tr><td><code>DropZone</code></td><td>On a <a href="templates.html#master">master page</a>: where the page's own body is injected</td></tr>
+	<tr><td><code>FragmentDropZone</code></td><td>The contents of an <a href="fragments.html#dropzones"><code>lfr-drop-zone</code></a> inside a fragment</td></tr>
 	<tr><td><code>Form</code></td><td>A <a href="forms.html">Form Container</a> bound to an object definition</td></tr>
+	<tr><td><code>FormStepContainer</code> / <code>FormStep</code> / <code>FormRelationship</code></td><td>Multi-step forms and related-entry blocks inside a <code>Form</code></td></tr>
 </table></div>
+<p>That list is the complete <code>PageElement.Type</code> enum in <code>headless-delivery</code> (2026.Q2), which is what <code>page-definition.json</code> uses. <code>headless-admin-site</code> has a <em>different</em> enum for the same concepts (<code>BasicFragment</code>, <code>Container</code>, <code>Grid</code>, <code>CollectionDisplay</code>, <code>FormContainer</code>&hellip;) &mdash; yet another vocabulary.</p>
 <p>Minimum viable page definition:</p>
 <pre><code>{
 	"pageElement": { "pageElements": [], "type": "Root" },
 	"version": "1.0"
 }</code></pre>
-<p>Selecting a master and adding a fragment:</p>
+<p>Selecting a master and adding a fragment with a typed-in value:</p>
 <pre><code>{
 	"pageElement": {
 		"pageElements": [
 			{
-				"definition": { "fragment": { "key": "home-hero", "siteKey": "[$GROUP_KEY$]" } },
+				"definition": {
+					"fragment": { "key": "home-hero", "siteKey": "[$GROUP_KEY$]" },
+					"fragmentFields": [
+						{ "id": "hero-title", "value": { "text": { "value_i18n": { "en_US": "Welcome to Badael" } } } }
+					]
+				},
 				"type": "Fragment"
 			}
 		],
@@ -60,6 +86,10 @@
 	"settings": { "masterPage": { "key": "badael-master" } },
 	"version": 1.1
 }</code></pre>
+<p><code>fragmentFields[].id</code> is the fragment's <code>data-lfr-editable-id</code>. Besides <code>masterPage</code>, the initializer reads <code>themeName</code>, <code>colorSchemeName</code>, <code>css</code> and <code>themeSettings</code> from <code>settings</code> &mdash; there is no key for a style book or a <a href="theme-design.html#trap">themeCSS client extension</a>.</p>
+
+<h3>Drafts: why an edit is not live</h3>
+<p>Every content page has a hidden <b>draft</b> layout. The page editor writes to the draft; <b>Publish</b> copies it onto the live page. That is why an editor can work for an hour without visitors seeing anything, why "I changed it but nothing happened" usually means "I did not publish", and why the site initializer writes to the draft and then copies it across itself. With <a href="workflow.html">workflow</a> enabled for content pages, Publish becomes a submission for review.</p>
 
 <h2>Page metadata (<code>page.json</code>)</h2>
 <pre><code>{
@@ -116,13 +146,17 @@
 </div>
 <div class="callout warn">
 	<b>Feature flags gate the page APIs</b>
-	<p><code>LPD-35443</code> for public layouts (off by default), <code>LPD-38869</code> for private (on), <code>LPD-39244</code> for fragment/page composition, <code>LPD-74328</code> for page-element creation (depends on <code>LPD-35443</code>). A 404 from a page endpoint usually means a flag, not a typo.</p>
+	<p>Defaults in 2026.Q2 <code>portal.properties</code>: <code>LPD-35443</code> (beta, off) for public layouts, <code>LPD-39244</code> (off) for fragment/page composition, <code>LPD-74328</code> (off) for page-element creation; <code>LPD-38869</code> is a deprecation-type flag that defaults to on. A 404 from a page endpoint usually means a flag, not a typo. Turn them on in Instance/System Settings &rarr; Feature Flags, or with <code>feature.flag.LPD-35443=true</code> in <code>portal-ext.properties</code>.</p>
 </div>
 
 <h2>Traps</h2>
 <div class="callout trap">
 	<b>Page composition changes need a full reprovision</b>
-	<p>Re-triggering a <a href="site-initializers.html">site initializer</a> upserts pages but does not retrofit composition changes onto pages that already exist. Editing <code>page-definition.json</code> for an existing page does nothing until the site is deleted and recreated.</p>
+	<p>Deploying a changed <a href="site-initializers.html">site initializer</a> re-runs it against the existing site, but don't count on that to update a page that already exists. In this project, edits to an existing page's <code>page-definition.json</code> reliably showed up only after the site was deleted and recreated, so that is the verified path. Be aware that the 2026.Q2 <code>BundleSiteInitializer</code> source does replace a content page's stored composition when it runs, deleting and re-importing its fragment instances. So a re-run can also <b>wipe editor changes</b> on that page. Either way, treat initializer-owned pages as code, not as something editors maintain.</p>
+</div>
+<div class="callout trap">
+	<b>Changing a page's type deletes and recreates it</b>
+	<p>If <code>page.json</code>'s <code>type</code> no longer matches the existing page at that friendly URL, <code>BundleSiteInitializer</code> deletes the old page and adds a new one &mdash; new plid, new permissions, editor content gone. Decide the type once.</p>
 </div>
 <div class="callout warn">
 	<b>Deleting the site does not delete your objects</b>

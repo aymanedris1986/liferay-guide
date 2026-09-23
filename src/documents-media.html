@@ -2,31 +2,41 @@
 <!--subtitle: The file repository. More than storage — documents are assets, so they get types, metadata, permissions, versioning, and a place in collections.-->
 
 <h2>In one sentence</h2>
-<p><b>Documents &amp; Media</b> is Liferay's file repository: folders of files with versioning, check-out, previews, <a href="taxonomy.html">categories</a>, permissions, and a stable URL &mdash; and, crucially, a <b>reference</b> that other content points at rather than copies.</p>
+<p><b>Documents &amp; Media</b> is Liferay's file repository. It gives you folders of files with versioning, check-out, previews, <a href="taxonomy.html">categories</a>, permissions and a stable URL. Just as important, a document is a <b>reference</b>: other content points at it instead of copying it.</p>
 
 <h2>Why it is not just a file upload</h2>
 <div class="wrap"><table>
 	<tr><th>Capability</th><th>What it buys you</th></tr>
 	<tr><td>Versioning + check-out</td><td>Replace a PDF and every page linking it updates; roll back if wrong</td></tr>
-	<tr><td>Document Types</td><td>A file type with required <b>metadata fields</b> &mdash; "Policy" documents must have owner, effective date, department</td></tr>
-	<tr><td>Metadata sets</td><td>Reusable groups of metadata fields shared across document types</td></tr>
+	<tr><td>Document Types</td><td>A file type with required <b>metadata fields</b>. For example, "Policy" documents must have an owner, effective date and department</td></tr>
+	<tr><td>Metadata sets</td><td>Reusable groups of metadata fields, added to document types under <em>Additional Metadata Fields</em></td></tr>
 	<tr><td>Asset behaviour</td><td><a href="taxonomy.html">Categories and tags</a>, search indexing, related assets</td></tr>
 	<tr><td>Permissions</td><td>Per folder and per document, same model as <a href="permissions.html">everything else</a></td></tr>
-	<tr><td>Previews</td><td>Server-rendered previews for PDFs, images, video, Office files</td></tr>
-	<tr><td>Adaptive media</td><td>Auto-generated image variants for different viewports</td></tr>
+	<tr><td>Previews</td><td>Server-rendered previews and thumbnails for PDFs, images, video and Office files. Office and PDF previews depend on external tools (LibreOffice, Ghostscript/ImageMagick) being installed and enabled</td></tr>
+	<tr><td>Adaptive Media</td><td>Auto-generated image variants for different viewports, served as a <code>srcset</code></td></tr>
 </table></div>
+
+<h3>Where files live: sites vs asset libraries</h3>
+<p>A Documents and Media library belongs to a <b>scope</b>, which is either a site or an <b>Asset Library</b> (DXP). An asset library is a site-less content repository that you connect to one or more sites. Its files, document types and vocabularies become selectable from those sites. When the same brand PDFs or logos are needed across Badael's sites, the asset library is the answer, not duplicating the files in every site.</p>
+<div class="ascii">  Asset Library "Badael Shared"          Site "Badael Intranet"
+  ├── Documents: logos/, policies/  ◀── connected ──  picker, collections, fragments
+  ├── Document Types: Policy                        can select library files
+  └── Vocabularies: Department      ◀── connected ──  Site "Badael Public"</div>
+<p>The binary itself is stored by the configured <b>file store</b>: the file system (the default), a database store, or S3/GCS/Azure-style stores. The database holds only the metadata row. This matters for backups: a DB dump alone does not give you back your documents.</p>
 
 <h2>Document Types vs Content Structures vs Objects</h2>
 <div class="wrap"><table>
 	<tr><th></th><th>Document Type</th><th><a href="content-structures.html">Content Structure</a></th><th><a href="objects.html">Object</a></th></tr>
 	<tr><td>Primary payload</td><td>A file</td><td>Field values</td><td>Field values</td></tr>
 	<tr><td>Extra fields</td><td>Metadata about the file</td><td>The content itself</td><td>The record itself</td></tr>
+	<tr><td>Always has</td><td>Upload File, Title, File Name, Description</td><td>Title</td><td>What you define</td></tr>
 	<tr><td>Use for</td><td>Policy PDFs with owner + expiry</td><td>News articles</td><td>Leave requests</td></tr>
 </table></div>
+<p>Document types are created under <em>Documents and Media &rarr; Document Types</em> in a site or asset library. Every custom type keeps the four default fields, and yours appear in addition to them. Since 7.4 the type is built with the same Data Engine form builder as content structures, so fields behave the same way (Field References, repeatable fields, field sets).</p>
 <div class="callout note">
 	<b>The common intranet question</b>
-	<p>"Policy documents with an owner, a department, and a review date" &mdash; is that a Document Type or an <a href="objects.html">Object</a> with an attachment field?</p>
-	<p><b>Document Type</b> when the file <em>is</em> the thing and the fields describe it. <b>Object</b> when the record is the thing, has a lifecycle or relationships, and the file is one attribute of it. If there is an approval flow, a status, or a link to another record, go Object.</p>
+	<p>Take "Policy documents with an owner, a department, and a review date". Is that a Document Type, or an <a href="objects.html">Object</a> with an attachment field?</p>
+	<p>Use a <b>Document Type</b> when the file <em>is</em> the thing and the fields describe it. Use an <b>Object</b> when the record is the thing, it has a lifecycle or relationships, and the file is one attribute of it. If there's an approval flow, a status, or a link to another record, go with an Object.</p>
 </div>
 
 <h2>How documents get referenced</h2>
@@ -35,23 +45,25 @@
 	<tr><td>A <a href="content-structures.html">structure</a> Image or Document field</td><td>Stores a reference; replacing the document updates every article</td></tr>
 	<tr><td>A <a href="fragments.html">fragment</a> editable</td><td><code>data-lfr-editable-type="image"</code> opens the media picker</td></tr>
 	<tr><td>An <a href="objects.html">object</a> Attachment field</td><td>Stores a file entry reference</td></tr>
-	<tr><td>A <a href="site-initializers.html#tokens">site initializer</a></td><td><code>[$DOCUMENT_JSON:/site-initializer/documents/group/&lt;folder&gt;/&lt;file&gt;$]</code></td></tr>
-	<tr><td>A direct URL</td><td><code>/documents/d/&lt;group-name&gt;/&lt;friendly-url&gt;</code></td></tr>
+	<tr><td>A <a href="site-initializers.html#tokens">site initializer</a></td><td><code>[$DOCUMENT_JSON:/site-initializer/documents/group/&lt;folder&gt;/&lt;file&gt;$]</code> for Image/Document field values. <code>[$DOCUMENT_URL:…$]</code> and <code>[$DOCUMENT_FILE_ENTRY_ID:…$]</code> also exist when you need just the URL or ID</td></tr>
+	<tr><td>A direct URL</td><td><code>/documents/d/&lt;site-friendly-url&gt;/&lt;file-friendly-url&gt;</code>. The older <code>/documents/&lt;groupId&gt;/&lt;folderId&gt;/&lt;title&gt;/&lt;uuid&gt;</code> form still resolves</td></tr>
 </table></div>
+<p>A site initializer's files go under <code>documents/group/</code>, where the folder tree becomes the D&amp;M folder tree. Files for the company-wide Global scope go under <code>documents/company/</code>. The <code>DOCUMENT_JSON</code> token expands to a serialised file entry (IDs, UUID, group, plus an empty <code>alt</code>), which is the JSON an Image field value expects. Pasting a URL there does not work.</p>
 <div class="callout warn">
 	<b>Reference, never copy</b>
-	<p>Pasting a document's URL as text into a Rich Text field breaks the reference. Move or rename the file and the link 404s, with nothing warning you. Use the Image/Document field type or the media picker so Liferay tracks the relationship.</p>
+	<p>If you paste a document's URL as text into a Rich Text field, the reference is lost. Move or rename the file and the link 404s, and nothing warns you. Use the Image/Document field type or the media picker so Liferay tracks the relationship.</p>
 </div>
 
 <h2>Listing documents</h2>
-<p>Documents are assets, so a <a href="collections.html">dynamic collection</a> can select them &mdash; filtered by folder, document type, or <a href="taxonomy.html">category</a> &mdash; and a <a href="fragments.html">fragment</a> renders each row. That is how you build "Policies &amp; Manuals" pages without writing a file browser.</p>
+<p>Documents are assets, so a <a href="collections.html">dynamic collection</a> can select them, filtered by folder, document type, or <a href="taxonomy.html">category</a>. A <a href="fragments.html">fragment</a> then renders each row. That's how you build "Policies &amp; Manuals" pages without writing a file browser.</p>
 <div class="ascii">  Documents folder "Policies"
         │  typed as Document Type "Policy" (owner, department, effective date)
         │  categorised under vocabulary "Department"
         ▼
-  Dynamic collection: type = Document, category = HR
+  Dynamic collection: type = Document, subtype = Policy, category = HR
         ▼
   Collection Display + policy-row fragment  ──▶  page /policies</div>
+<p>In the row fragment, map editables to the document's fields: title, the download URL, and the document type's metadata fields, which show up as mappable fields once the collection is filtered to that subtype. Documents can also have a <a href="templates.html#display">display page template</a> of their own, bound to <code>FileEntry</code> and optionally a document type, which gives each file a landing page instead of a bare download.</p>
 
 <h2>How it connects</h2>
 <ul class="rel">
@@ -61,24 +73,42 @@
 	<li><a href="taxonomy.html">Categories &mdash; how documents get filtered</a></li>
 	<li><a href="objects.html">Objects &mdash; attachment fields</a></li>
 	<li><a href="permissions.html">Permissions &mdash; per folder and per file</a></li>
+	<li><a href="templates.html#display">Display page templates &mdash; a page per document</a></li>
 	<li><a href="headless-apis.html">Headless APIs &mdash; upload and fetch</a></li>
 </ul>
 
 <h2>API</h2>
-<pre><code>POST /o/headless-delivery/v1.0/sites/{siteId}/documents     # multipart upload
+<pre><code>POST /o/headless-delivery/v1.0/sites/{siteId}/documents                 # multipart upload
+POST /o/headless-delivery/v1.0/document-folders/{folderId}/documents     # into a folder
+POST /o/headless-delivery/v1.0/asset-libraries/{assetLibraryId}/documents
 GET  /o/headless-delivery/v1.0/documents/{documentId}</code></pre>
-<p>Note this module uses the <b>numeric</b> <code>siteId</code>, unlike <a href="headless-apis.html">headless-admin-site</a> which uses the ERC.</p>
+<p>An upload is <code>multipart/form-data</code> with a <code>file</code> part and an optional <code>document</code> part. The <code>document</code> part is JSON carrying <code>title</code>, <code>taxonomyCategoryIds</code>, <code>documentType</code> and so on:</p>
+<pre><code>curl -u test@liferay.com:test \
+	-F "file=@hr-leave-policy.pdf" \
+	-F 'document={"title":"Leave Policy","taxonomyCategoryIds":[43120]}' \
+	http://localhost:8080/o/headless-delivery/v1.0/sites/20121/documents</code></pre>
+<p>In this module, <code>{siteId}</code> is the site's group ID (or its site key). It is not the ERC path parameter that <a href="headless-apis.html">headless-admin-site</a> uses.</p>
+
+<h2>Where Documents &amp; Media is heading</h2>
+<div class="callout note">
+	<b>Maintenance mode since 2026.Q1</b>
+	<p>Liferay's 2026.Q1 deprecation notes move <b>Documents and Media</b>, <b>Web Content</b>, <b>Blogs</b>, <b>Knowledge Base</b> and <b>Asset Libraries</b> into maintenance mode, with "consider using the Liferay CMS" as the replacement. The new CMS keeps files as <em>file entries</em> with customisable <em>file structures</em>, organised in <b>spaces</b> in place of asset libraries. It sits behind the <code>CMS</code> feature flag in 2026.Q2 and is GA without a flag from 2026.Q3. On a 2026.Q2 project, classic D&amp;M is still the supported, fully integrated choice. Just don't build a long-lived custom extension on its internals, and keep your file handling behind the Headless APIs so a later move is a data migration rather than a rewrite.</p>
+</div>
 
 <h2>Traps</h2>
 <div class="callout trap">
 	<b>Guest needs VIEW on the folder too</b>
-	<p>A public page embedding a private document shows a broken image or a 403 download, while the page itself returns 200. Grant VIEW on the folder, and verify with an unauthenticated <code>curl</code> &mdash; see <a href="permissions.html#guest">Guest access</a>.</p>
+	<p>A public page that embeds a private document shows a broken image or gives a 403 on download, while the page itself returns 200. By default, the permission check on a file also checks VIEW on its parent folders. Grant VIEW on the folder chain, and verify with an unauthenticated <code>curl</code>. See <a href="permissions.html#guest">Guest access</a>.</p>
+</div>
+<div class="callout trap">
+	<b>Previews quietly missing</b>
+	<p>Uploads succeed, but PDFs and Office files show a generic icon. The external converters aren't installed or enabled (<em>Control Panel &rarr; Server Administration &rarr; External Services</em>). In Docker images, that is a container-level dependency, not a Liferay setting.</p>
 </div>
 <div class="callout warn">
 	<b>Removing a Document Type field orphans its metadata</b>
-	<p>Same rule as <a href="content-structures.html">content structures</a>: values are stored keyed by field, so deleting the field makes them unreachable.</p>
+	<p>This is the same rule as for <a href="content-structures.html">content structures</a>. Values are stored keyed by field, so deleting the field makes them unreachable.</p>
 </div>
 <div class="callout warn">
-	<b>Web Content fields in Document Types are gone</b>
-	<p>Support was discontinued. Any references in old configurations must be removed.</p>
+	<b>Upload size has two limits</b>
+	<p>D&amp;M's own maximum file size and the portal-wide upload request size both apply. A large video that fails to upload usually hits whichever limit is lower. Check both before blaming the proxy (which is the third limit).</p>
 </div>

@@ -80,34 +80,63 @@
 <p>Two conventions carry the whole thing: the container names the object by <b>class name token</b>, and every input names its field as <code>ObjectField_&lt;fieldName&gt;</code>.</p>
 
 <h3>Built-in input fragments</h3>
+<p>These are the fragments in the <b>Form Components</b> set (collection key <code>INPUTS</code>). Each declares the field types it accepts; when you map a container to an object, Liferay picks a default per field type and you can swap it for any other compatible input.</p>
 <div class="wrap"><table>
-	<tr><th>Key</th><th>Binds to</th></tr>
-	<tr><td><code>INPUTS-text-input</code></td><td>Text, LongText, Integer, Decimal, Email</td></tr>
-	<tr><td><code>INPUTS-select-from-list</code></td><td><a href="objects.html#picklists">Picklist</a> fields <b>and relationship fields</b></td></tr>
-	<tr><td><code>INPUTS-date-input</code></td><td>Date / DateTime</td></tr>
-	<tr><td><code>INPUTS-checkbox</code>, <code>INPUTS-radio</code></td><td>Boolean, small enumerations</td></tr>
-	<tr><td><code>INPUTS-attachment</code></td><td>Attachment fields</td></tr>
-	<tr><td><code>INPUTS-captcha</code></td><td>CAPTCHA verification</td></tr>
-	<tr><td><code>INPUTS-submit-button</code></td><td>Submits the container</td></tr>
+	<tr><th>Key</th><th>Accepts</th><th>Default for</th></tr>
+	<tr><td><code>INPUTS-text-input</code></td><td>Text, LongText</td><td>Text</td></tr>
+	<tr><td><code>INPUTS-textarea</code></td><td>Text, LongText</td><td>LongText</td></tr>
+	<tr><td><code>INPUTS-rich-text-input</code></td><td>RichText</td><td>RichText</td></tr>
+	<tr><td><code>INPUTS-numeric-input</code></td><td>Integer, LongInteger, Decimal, PrecisionDecimal</td><td>all numbers</td></tr>
+	<tr><td><code>INPUTS-select-from-list</code></td><td><a href="objects.html#picklists">Picklist</a> <b>and relationship</b> fields</td><td>Picklist, relationship</td></tr>
+	<tr><td><code>INPUTS-multiselector-dropdown</code>, <code>INPUTS-multiple-select-from-list</code></td><td>MultiselectPicklist (the dropdown also takes relationships)</td><td>Multiselect (dropdown)</td></tr>
+	<tr><td><code>INPUTS-date-input</code> / <code>INPUTS-date-time-input</code></td><td>Date / DateTime</td><td>each its own</td></tr>
+	<tr><td><code>INPUTS-checkbox</code></td><td>Boolean</td><td>Boolean</td></tr>
+	<tr><td><code>INPUTS-file-upload</code>, <code>INPUTS-drag-and-drop-upload</code></td><td>Attachment fields</td><td>Attachment (file upload)</td></tr>
+	<tr><td><code>INPUTS-captcha</code></td><td>CAPTCHA verification, not a field</td><td>&mdash;</td></tr>
+	<tr><td><code>INPUTS-stepper</code></td><td>Turns sections into a multi-step form</td><td>&mdash;</td></tr>
+	<tr><td><code>INPUTS-submit-button</code></td><td>Submits the container</td><td>&mdash;</td></tr>
 </table></div>
+<p>Keys are from the 2026.Q2 <code>fragment-collection-contributor-inputs</code> module. There is no radio-button input in that set; for a small enumeration use a picklist with <code>select-from-list</code>, or write a custom input.</p>
 <p>A relationship field is selected exactly like a picklist &mdash; <code>inputFieldId: "ObjectField_r_ticketToProject_c_projectId"</code> gives the visitor a picker over the related object's entries.</p>
 
+<h3>Multi-step forms</h3>
+<p>Put each step's inputs in its own section inside the one Form Container and add the <b>Stepper</b> fragment; it turns the sections into steps with next/previous navigation. It is still <b>one</b> object entry, created on the final submit &mdash; there is no "save step 1" unless you model steps as separate objects. For long, resumable applications, the docs describe an alternative built from several display page templates, one per step, each updating the same entry.</p>
+
+<h3>After submit</h3>
+<p>The Form Container's configuration decides what the visitor sees on success: an inline success message, or a redirect (to a page, an external URL, or the new entry's <a href="templates.html#display">display page</a>). The display-page option is a cheap "here is what you submitted" page &mdash; but only if the visitor can VIEW the entry, which on a public form they usually cannot.</p>
+
 <h2>Custom input fragments</h2>
-<p>When the built-in inputs are not enough &mdash; a stepper, a card picker, a dependent dropdown &mdash; write a <a href="fragments.html#types">fragment of type <b>input</b></a>. It declares which field type it accepts and Liferay handles the binding and submission; you own the markup and behaviour.</p>
+<p>When the built-in inputs are not enough &mdash; a stepper, a card picker, a dependent dropdown &mdash; write a <a href="fragments.html#types">fragment of type <b>input</b></a>. It declares which field types it accepts and Liferay handles the binding and submission; you own the markup and behaviour. The declaration is the same one the built-in <code>text-input</code> uses:</p>
+<pre><code>{
+	"fragmentEntryKey": "badael-seat-picker",
+	"name": "Seat Picker",
+	"type": "input",
+	"typeOptions": {
+		"fieldTypes": ["select", "relationship"]
+	}
+}</code></pre>
+<p>Field type names are the info-framework ones, not object business types: <code>text</code>, <code>long-text</code>, <code>number</code>, <code>boolean</code>, <code>date</code>, <code>date-time</code>, <code>select</code>, <code>multiselect</code>, <code>relationship</code>, <code>file</code>, <code>html</code>. Inside the template, the <code>input</code> FreeMarker variable carries the field's name, label, required flag, value and options &mdash; your markup must submit a form control named after <code>input.name</code>, or the value is dropped.</p>
 <div class="callout note">
 	<b>Custom inputs must live inside a Form Container</b>
 	<p>An input fragment placed outside a container has nothing to bind to. It will render, and it will submit nothing.</p>
 </div>
 
-<h2>Forms vs the older Forms application</h2>
+<h2>Form Container vs the Forms application</h2>
+<p>Liferay has two form systems, and the official position changed recently: the <b>Forms application</b> (the DDM-based Forms widget, with its own form builder) has been <b>in maintenance mode since 2024.Q4</b>. The docs say to migrate forms to Objects and form container fragments. <b>Kaleo Forms</b> (Forms + a workflow in one app) is further along: in 2026.Q2 it sits behind a deprecation feature flag (<code>LPD-74739</code>) and is scheduled for removal, with the same advice &mdash; form container fragments, objects and workflow.</p>
 <div class="wrap"><table>
-	<tr><th></th><th>Form Container + Object</th><th>Legacy Forms widget (DDM)</th></tr>
-	<tr><td>Data lands in</td><td>An <a href="objects.html">Object</a> &mdash; queryable, related, permissioned</td><td>A form-record store</td></tr>
-	<tr><td>Layout control</td><td>Full page editor, your own fragments</td><td>Form builder only</td></tr>
-	<tr><td>Reporting</td><td>Object admin UI, REST, <a href="collections.html">collections</a></td><td>Export CSV</td></tr>
-	<tr><td>Logic on submit</td><td><a href="workflow.html#actions">Object actions</a>, <a href="workflow.html">workflow</a>, CETs</td><td>Limited</td></tr>
-	<tr><td>Recommended</td><td><b>Yes</b></td><td>Only for existing forms</td></tr>
+	<tr><th></th><th>Form Container + Object</th><th>Forms application (DDM)</th></tr>
+	<tr><td>Status in 2026.Q2</td><td>The strategic path</td><td>Maintenance mode &mdash; works, gets fixes, no new direction</td></tr>
+	<tr><td>Data lands in</td><td>An <a href="objects.html">Object</a> &mdash; queryable, related, permissioned, its own REST API</td><td>Form records (DDM storage)</td></tr>
+	<tr><td>Who builds it</td><td>Page editor, your own <a href="fragments.html">fragments</a></td><td>A business user in the form builder</td></tr>
+	<tr><td>Field logic</td><td>Object validations; custom inputs for client-side behaviour</td><td>Built-in rules (show/hide, enable, require, calculate), data providers, element sets</td></tr>
+	<tr><td>Reporting</td><td>Object admin UI, REST, <a href="collections.html">collections</a></td><td>Built-in report view, CSV/XLS export</td></tr>
+	<tr><td>Logic on submit</td><td><a href="workflow.html#actions">Object actions</a>, <a href="workflow.html">workflow</a>, CETs</td><td>Workflow, email notification to a fixed address</td></tr>
+	<tr><td>Use for</td><td><b>Everything new</b></td><td>Existing forms until migrated</td></tr>
 </table></div>
+<div class="callout note">
+	<b>What you give up by moving</b>
+	<p>The Forms application's rule builder (show field B when A = "Other") has no no-code equivalent in a Form Container. You either write a small custom input fragment that owns the conditional behaviour, or split the logic across object validations. Budget for that when migrating a rules-heavy form.</p>
+</div>
 
 <h2>Public forms &mdash; the rules that matter</h2>
 <p>A form open to anonymous visitors has a specific permission shape, and getting it wrong either breaks the form or leaks data.</p>

@@ -66,47 +66,84 @@
   A/B TEST           two variants of an experience, measured against a goal
                         which one performs better</div>
 
+<div class="callout warn">
+	<b>2026.Q1 changed where segments are authored</b>
+	<p>From 2026.Q1, local segment authoring in DXP is <b>deprecated</b>: segmentation is moving to Analytics Cloud as the single source of truth. On a <em>new</em> installation the Segments app is <b>read-only</b> by default and shows segments synced from Analytics Cloud; to create or edit segments locally you enable the deprecation feature flag <code>LPD-78863</code>, which will be removed in a future release. Upgraded installations keep local authoring for at least a year, with a deprecation badge. So on a fresh 2026.Q2 environment, "I cannot create a segment" is a flag, not a permission problem &mdash; and anything you build on locally-defined segments has a clock on it.</p>
+</div>
+
 <h2>Segments</h2>
-<p>A <b>segment</b> is a saved audience definition, evaluated per request. Criteria come from several sources:</p>
+<p>A <b>segment</b> is a saved audience definition, evaluated per request. Criteria come from four property groups in the segment editor:</p>
 <div class="wrap"><table>
-	<tr><th>Source</th><th>Examples</th></tr>
-	<tr><td>User attributes</td><td>Job title, organization, user group, role, email domain</td></tr>
-	<tr><td>Organization / account</td><td>Department, region, B2B account membership</td></tr>
-	<tr><td>Session</td><td>Locale, browser, device, referrer, signed-in state</td></tr>
-	<tr><td>Behaviour (with Analytics Cloud)</td><td>Pages viewed, content interacted with, campaign source</td></tr>
-	<tr><td>Custom fields</td><td>Anything you added to the user model</td></tr>
+	<tr><th>Group</th><th>Examples</th></tr>
+	<tr><td>User</td><td>Email, name, job title, screen name, date of birth, regular role, site, team, user group, tags</td></tr>
+	<tr><td>Organization</td><td>Name, type, parent organization, hierarchy path, country, region, tags</td></tr>
+	<tr><td>Session</td><td>Browser, device, language, signed-in state, last sign-in, local date, URL, referrer URL, request parameters, cookies, IP-geocoded country</td></tr>
+	<tr><td>Segments</td><td>Other segments, combined into a compound segment</td></tr>
 </table></div>
-<p>Segments are reusable: define "Managers" once and use it for page experiences, <a href="permissions.html">personalised content</a>, and notification targeting.</p>
+<p>Behavioural audiences &mdash; "viewed three pricing pages", "came from the spring campaign" &mdash; are built in <b>Analytics Cloud</b> and synced into DXP; the DXP editor itself only sees the request and the user record.</p>
+<p>Segments are reusable: define "Managers" once and use it for page experiences, <a href="collections.html#variations">collection variations</a>, and A/B tests.</p>
+
+<h3>Segments in an initializer</h3>
+<p><code>BundleSiteInitializer</code> has handlers for both halves. <code>segments-entries.json</code> is an array of segments, upserted by <code>segmentsEntryKey</code>:</p>
+<pre><code>[
+	{
+		"active": true,
+		"criteria": { &hellip; the criteria JSON the segment editor stores &hellip; },
+		"name_i18n": { "en_US": "Managers" },
+		"segmentsEntryKey": "BADAEL_MANAGERS"
+	}
+]</code></pre>
+<p>Each segment publishes <code>[$SEGMENTS_ENTRY_ID:BADAEL_MANAGERS$]</code>, <code>[$SEGMENTS_ENTRY_ERC:&hellip;$]</code> and <code>[$SEGMENTS_ENTRY_SCOPE_ERC:&hellip;$]</code> tokens. Do not hand-write <code>criteria</code>: build the segment once in the UI (with the flag above if needed) and copy its stored criteria.</p>
+<p>Experiences come from <code>segments-experiences/&lt;name&gt;/segments-experiences.json</code>, which names the page and the segment, with the experience's own composition in a sub-directory beside it:</p>
+<div class="ascii">segments-experiences/managers-home/
+├── segments-experiences.json
+│     { "friendlyURL": "/home",
+│       "name_i18n": { "en_US": "Managers" },
+│       "segmentsEntryERC": "[$SEGMENTS_ENTRY_ERC:BADAEL_MANAGERS$]",
+│       "segmentsEntryScopeERC": "[$SEGMENTS_ENTRY_SCOPE_ERC:BADAEL_MANAGERS$]",
+│       "active": true }
+└── home/
+    ├── page.json                 "type": "Content"
+    └── page-definition.json      the experience's own composition</div>
+<div class="callout trap">
+	<b>The experience handler has sharp edges</b>
+	<p>It looks the page up among <b>public</b> pages only; it <b>appends</b> a new experience each time it runs rather than upserting one; and if any <code>segments-experiences/*/</code> folder lacks its <code>segments-experiences.json</code>, the handler <em>returns</em> &mdash; skipping every folder after it, in no guaranteed order. One folder per experience, always with its JSON.</p>
+</div>
 <div class="callout note">
 	<b>Segment vs role &mdash; they are not the same thing</b>
 	<p>A <a href="permissions.html">role</a> answers "what may this person <em>do</em>" and is enforced by the security layer. A segment answers "what should this person <em>see</em>" and is a presentation concern. Never use a segment to hide sensitive content &mdash; the content is still served, just not shown. Use permissions for that.</p>
 </div>
 
 <h2>Experiences</h2>
-<p>An <b>experience</b> is a complete alternative composition of one <a href="pages.html">content page</a>, bound to a segment. Same URL, same page, different <a href="fragments.html">fragments</a>, different mapped content, different <a href="collections.html">collections</a>.</p>
+<p>An <b>experience</b> is a complete alternative composition of one <a href="pages.html">content page</a>, bound to a segment. Same URL, same page, different <a href="fragments.html">fragments</a>, different mapped content, different <a href="collections.html">collections</a>. Technically, each experience is its own copy of the page's layout structure and its own set of fragment instances, keyed by experience ID &mdash; which is exactly why they do not share edits.</p>
 <div class="wrap"><table>
 	<tr><th>Property</th><th>Behaviour</th></tr>
-	<tr><td>Priority</td><td>Experiences are ordered; the first whose segment matches wins</td></tr>
-	<tr><td>Default</td><td>The last one, matching everybody. Always exists.</td></tr>
+	<tr><td>Priority</td><td>Experiences are ordered; the highest-ranked one whose segment matches wins. Reorder with the up/down controls in the experience menu.</td></tr>
+	<tr><td>Default</td><td>The fallback, matching everybody. Always exists.</td></tr>
+	<tr><td>Creation</td><td>A new experience starts as a <em>copy</em> of Default and targets the <em>Anyone</em> segment until you change it</td></tr>
 	<tr><td>Scope</td><td>Per page. Not per site, not per fragment.</td></tr>
 	<tr><td>Editing</td><td>Each experience is edited independently in the page editor</td></tr>
 </table></div>
 <div class="callout warn">
 	<b>Experiences multiply your maintenance</b>
-	<p>Three experiences on a page means three compositions to update when the design changes. They do not inherit from the default. Use them where the difference is genuinely worth it &mdash; a different hero and CTA &mdash; not to vary a single word.</p>
+	<p>Three experiences on a page means three compositions to update when the design changes. A new experience is copied from Default once, then never hears from it again &mdash; no inheritance. Use them where the difference is genuinely worth it &mdash; a different hero and CTA &mdash; not to vary a single word.</p>
 </div>
 
 <h3>Cheaper alternatives to a full experience</h3>
 <div class="wrap"><table>
 	<tr><th>Need</th><th>Cheaper option</th></tr>
+	<tr><td>One list differs by audience</td><td>A <a href="collections.html#variations">personalized collection variation</a> per segment &mdash; one page, one display</td></tr>
 	<tr><td>One block differs by audience</td><td>A <a href="collections.html">collection</a> filtered by a <a href="taxonomy.html">category</a> the audience already implies</td></tr>
 	<tr><td>Language differences</td><td>Localisation, not segmentation &mdash; <a href="web-content.html">Web Content</a> is translatable per field</td></tr>
 	<tr><td>Signed-in vs signed-out</td><td>Page permissions plus a separate page, usually clearer</td></tr>
 	<tr><td>Department-specific news</td><td>One page, one collection, filtered by the user's department category</td></tr>
 </table></div>
 
+<h3>Element variations (beta)</h3>
+<p>Behind feature flag <code>LPD-85746</code> (the same flag as <em>Audiences</em>), variations can target a single element instead of the whole page &mdash; replace its inner HTML, run JavaScript, or hide it. They are applied in the <b>browser, after</b> the server has rendered the experience. That makes them cheap to maintain, and also means the original markup was sent to the visitor: fine for a different CTA, never for anything confidential. Beta &mdash; do not build a delivery on it.</p>
+
 <h2>A/B testing</h2>
-<p>With Analytics Cloud connected, an A/B test runs two variants of an experience against a goal (clicks, bounce rate, conversion) and reports a winner, which you can then publish as the default.</p>
+<p>With Analytics Cloud connected, an A/B test runs variants of one experience against a goal (such as clicks or bounce rate) and reports a winner, which you can then publish. While a test is running the experience under test is read-only, so editors cannot skew the result mid-test.</p>
 <ul>
 	<li>Needs enough traffic to reach significance &mdash; on an intranet with 300 users, usually it does not.</li>
 	<li>Requires Analytics Cloud; without it you get experiences but no measurement.</li>
@@ -133,8 +170,8 @@
 	<p>Personalised pages cannot be cached as aggressively as static ones. A page with many experiences is a page you are serving fresh each time &mdash; worth knowing before applying it to the homepage.</p>
 </div>
 <div class="callout warn">
-	<b>Experiences are not carried by a site initializer's page upserts</b>
-	<p>Like any <a href="pages.html">page composition</a> change, adding an experience to an existing page needs a <a href="site-initializers.html#reprovision">reprovision</a> to come from source.</p>
+	<b>Experiences from source arrive at site creation only</b>
+	<p>The <code>segments-experiences/</code> handler runs with the rest of the initializer, at site creation. Like any <a href="pages.html">page composition</a> change, adding an experience to an existing page needs a <a href="site-initializers.html#reprovision">reprovision</a> to come from source &mdash; and given the append behaviour above, re-running the handler against a live site would duplicate experiences rather than update them.</p>
 </div>
 		<footer class="pagefoot">
 			Part of the <a href="index.html">Liferay Component Guide</a>.

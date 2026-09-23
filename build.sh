@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # build.sh — wrap each src/<slug>.html body in the shared shell (head, topbar, sidebar).
-# Run from docs/liferay-guide:  bash build.sh
+# Run from the repo root:  bash build.sh
 #
 set -o errexit
 set -o nounset

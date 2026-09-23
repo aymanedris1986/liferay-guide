@@ -57,52 +57,80 @@
 		<p class="lede">The classification layer that makes dynamic collections, search facets and cross-type listings possible. Small feature, disproportionately large payoff.</p>
 
 <h2>The asset framework</h2>
-<p>Web Content articles, Documents, Blog posts, <a href="objects.html">Object</a> entries and more are all <b>assets</b>. Being an asset means a thing automatically gets: categories and tags, search indexing, related assets, view counts, ratings and comments, and eligibility for a <a href="collections.html">collection</a>.</p>
-<p>This is why a single dynamic collection can list "everything tagged <em>onboarding</em>" across articles, PDFs and records at once.</p>
+<p>Web Content articles, Documents, Blog posts, <a href="objects.html">Object</a> entries and more are all <b>assets</b>. Every asset has one row in a shared <code>AssetEntry</code> table, next to its own table. Through that row it gets categories and tags, search indexing, related assets and view counts, and becomes eligible for a <a href="collections.html">collection</a>. Ratings and comments hang off the same framework where the type supports them.</p>
+<p>This is why a single dynamic collection can list "everything tagged <em>onboarding</em>" across articles, PDFs and records at once. The collection queries the asset layer, not the three underlying tables.</p>
+<div class="ascii">  JournalArticle ─┐
+  DLFileEntry    ─┼──▶  AssetEntry  ──▶  AssetCategory  (in a vocabulary)
+  BlogsEntry     ─┤        │       └──▶  AssetTag       (flat)
+  ObjectEntry    ─┘        └──▶  search index · related assets · collections</div>
 
 <h2>Categories vs tags</h2>
 <div class="wrap"><table>
 	<tr><th></th><th>Categories</th><th>Tags</th></tr>
 	<tr><td>Structure</td><td>Hierarchical, inside a <b>vocabulary</b></td><td>Flat, free-text</td></tr>
-	<tr><td>Who creates them</td><td>Admins, up front</td><td>Anyone, while authoring</td></tr>
-	<tr><td>Governed</td><td>Yes &mdash; a fixed, translatable list</td><td>No &mdash; typos multiply</td></tr>
-	<tr><td>Can be required</td><td>Yes, per vocabulary</td><td>No</td></tr>
+	<tr><td>Who creates them</td><td>Site administrators, up front</td><td>Anyone, while authoring</td></tr>
+	<tr><td>Governed</td><td>Yes: a fixed, translatable list</td><td>No: typos multiply</td></tr>
+	<tr><td>Can be required</td><td>Yes, per vocabulary and per asset type</td><td>No</td></tr>
+	<tr><td>Stable identifier</td><td>ID and <b>external reference code</b>. Set the ERC yourself</td><td>ID and ERC exist, but editors create and match tags by name</td></tr>
 	<tr><td>Use for</td><td>Department, Document Type, Audience, Region</td><td>Ad-hoc keywords, campaign labels</td></tr>
 </table></div>
 <div class="callout note">
 	<b>Practical rule</b>
-	<p>If a <a href="collections.html">collection</a>, a navigation structure, or a permission depends on it, it must be a <b>category</b>. Tags are for search relevance and nothing you build logic on.</p>
+	<p>If a <a href="collections.html">collection</a>, a navigation structure, a search facet or any code depends on it, it must be a <b>category</b>. Tags help search relevance, and nothing you build logic on.</p>
 </div>
 
 <h3>Vocabularies</h3>
-<p>A vocabulary is a named set of categories, and it is where governance lives:</p>
+<p>A vocabulary is a named set of categories, and it is where governance lives. You create one under <em>Site Menu &rarr; Categorization &rarr; Categories &rarr; New Vocabulary</em>.</p>
 <ul>
-	<li><b>Scope</b> &mdash; site-level, or instance-level (shared across every site).</li>
-	<li><b>Restrictions</b> &mdash; limit a vocabulary to specific asset types, so "Department" only appears on the content it belongs on.</li>
-	<li><b>Required</b> &mdash; authors cannot publish without choosing a category.</li>
-	<li><b>Translatable</b> &mdash; category names have per-locale labels, so an Arabic visitor sees Arabic facets.</li>
+	<li><b>Scope</b>: a site, an asset library, or the <b>Global</b> site. Global vocabularies can be used in every site of the instance, but they can only be edited in the Global site.</li>
+	<li><b>Associated asset types</b>: limit a vocabulary to specific asset types, down to subtypes such as a particular structure or document type. That way "Department" only appears on the content it belongs to. The default is All Asset Types.</li>
+	<li><b>Required</b>: set <em>per associated asset type</em>. For example, Policy documents must have a Department but news articles need not. Authors can't save that type without choosing a category.</li>
+	<li><b>Allow multiple categories</b>: on by default. Turn it off for single-valued concepts like "owning department".</li>
+	<li><b>Visibility</b>: <em>Public</em> categories can be used by visitors, in search facets and navigation. <em>Internal</em> ones are for editors' organising and searching only. <b>You can't change this after saving.</b></li>
+	<li><b>Translatable</b>: category names have per-locale labels, so an Arabic visitor sees Arabic facets.</li>
 </ul>
-<div class="ascii">  Vocabulary "Department"  (instance scope, required on Policy content)
+<div class="ascii">  Vocabulary "Department"  (Global, required on Document &gt; Policy, single-valued)
   ├── Human Resources
   ├── Finance
   │   ├── Accounts Payable
   │   └── Treasury
   └── Operations
 
-  Vocabulary "Audience"
+  Vocabulary "Audience"  (Internal visibility)
   ├── All staff
   └── Managers only</div>
+
+<h3>In a site initializer</h3>
+<p>Vocabularies are one JSON file each. A folder with the same name holds that vocabulary's categories, and nesting folders nests categories. Use <code>group/</code> for the site and <code>company/</code> for the Global site:</p>
+<pre><code>site-initializer/taxonomy-vocabularies/
+	company/
+		department.json               { "externalReferenceCode": "DEPARTMENT", "name": "Department", "viewableBy": "Anyone" }
+		department/
+			finance.json              { "externalReferenceCode": "DEPT-FINANCE", "name": "Finance", ... }
+			finance/
+				treasury.json
+	group/
+		audience.json</code></pre>
+<p>Other files refer to a category by its <b>resource path</b>, not its name: <code>[$TAXONOMY_CATEGORY_ID:/site-initializer/taxonomy-vocabularies/company/department/finance.json$]</code>. A vocabulary is referenced by name: <code>[$TAXONOMY_VOCABULARY_ID:Department$]</code>. Always set <code>externalReferenceCode</code>. With an ERC, re-provisioning updates the vocabulary in place. Without one, the initializer matches by name.</p>
 
 <h2>What categorisation unlocks</h2>
 <div class="wrap"><table>
 	<tr><th>Feature</th><th>Depends on categories</th></tr>
-	<tr><td><a href="collections.html">Dynamic collections</a></td><td>"All documents in Finance" &mdash; the filter is the category</td></tr>
+	<tr><td><a href="collections.html">Dynamic collections</a></td><td>"All documents in Finance": the filter is the category</td></tr>
 	<tr><td>Collection filter fragments</td><td>Visitor-facing narrowing by category</td></tr>
-	<tr><td>Search facets</td><td>The left-hand refinement panel</td></tr>
-	<tr><td><a href="personalization.html">Segments</a></td><td>Audience rules can reference categorised content interactions</td></tr>
+	<tr><td>Search facets</td><td>The Category facet in the refinement panel (internal vocabularies are not exposed to visitors)</td></tr>
+	<tr><td><a href="personalization.html">Personalization</a></td><td>A collection can have per-segment variations, e.g. the same "News" collection filtered to category Finance for the Finance segment. Note that local segment authoring in DXP is deprecated as of 2026.Q1 in favour of Analytics Cloud</td></tr>
 	<tr><td>Related assets</td><td>"More from this department"</td></tr>
-	<tr><td>Navigation</td><td>A Categories Navigation widget, or category-driven landing pages</td></tr>
+	<tr><td>Navigation</td><td>A Categories Navigation widget, a navigation menu item pointing at a category, or category-driven landing pages</td></tr>
+	<tr><td>Templates</td><td>Categories are an info-framework item type, so they can have an <a href="templates.html">Information Template</a> or a <a href="templates.html#display">display page</a> of their own</td></tr>
 </table></div>
+
+<h2>API</h2>
+<pre><code>GET  /o/headless-admin-taxonomy/v1.0/sites/{siteId}/taxonomy-vocabularies
+GET  /o/headless-admin-taxonomy/v1.0/taxonomy-vocabularies/{vocabularyId}/taxonomy-categories
+POST /o/headless-admin-taxonomy/v1.0/taxonomy-vocabularies/{vocabularyId}/taxonomy-categories
+PUT  /o/headless-admin-taxonomy/v1.0/sites/{siteId}/taxonomy-vocabularies/by-external-reference-code/{erc}</code></pre>
+<p>Assets carry categories as <code>taxonomyCategoryIds</code> when written and <code>taxonomyCategoryBriefs</code> when read, in <a href="headless-apis.html">headless-delivery</a> payloads for structured content and documents. Filter a listing with <code>?filter=taxonomyCategoryIds/any(t:t eq 43120)</code>.</p>
 
 <h2>How it connects</h2>
 <ul class="rel">
@@ -110,32 +138,42 @@
 	<li><a href="web-content.html">Web Content &mdash; categorised on publish</a></li>
 	<li><a href="documents-media.html">Documents &mdash; categorised too</a></li>
 	<li><a href="objects.html">Objects &mdash; entries can be assets</a></li>
-	<li><a href="personalization.html">Segments &mdash; audience rules</a></li>
-	<li><a href="site-initializers.html#tokens">Initializer tokens &mdash; <code>[$TAXONOMY_CATEGORY_ID:X$]</code></a></li>
+	<li><a href="personalization.html">Personalization &mdash; per-segment collection variations</a></li>
+	<li><a href="site-initializers.html#tokens">Initializer tokens &mdash; <code>[$TAXONOMY_CATEGORY_ID:&lt;path&gt;$]</code></a></li>
 </ul>
 
 <h2>Design it before you create content</h2>
-<p>Retro-fitting a vocabulary onto 4,000 existing documents means someone categorises 4,000 documents. Decide the vocabularies at the start of a project, restrict them to the right asset types, and mark them required. This is a fifteen-minute decision that saves a week.</p>
+<p>Retro-fitting a vocabulary onto 4,000 existing documents means someone has to categorise 4,000 documents. Decide the vocabularies at the start of the project, restrict them to the right asset types, and mark them required. It's a fifteen-minute decision that saves a week.</p>
 <div class="wrap"><table>
 	<tr><th>Do</th><th>Don't</th></tr>
-	<tr><td>Few vocabularies, each with a clear question ("which department owns this?")</td><td>One giant "Tags" vocabulary that means nothing</td></tr>
-	<tr><td>Instance scope for cross-site concepts</td><td>Duplicating "Department" per site and hoping the names match</td></tr>
+	<tr><td>Few vocabularies, each answering one clear question ("which department owns this?")</td><td>One giant "Tags" vocabulary that means nothing</td></tr>
+	<tr><td>Global (or asset-library) scope for cross-site concepts</td><td>Duplicating "Department" per site and hoping the names match</td></tr>
 	<tr><td>Restrict to asset types</td><td>Showing every vocabulary on every form and training editors to ignore them</td></tr>
+	<tr><td>Decide Public vs Internal deliberately, since it's permanent</td><td>Leaving the default and discovering internal labels in a public facet</td></tr>
 	<tr><td>Translate category names</td><td>English-only facets on a bilingual intranet</td></tr>
+	<tr><td>Reference categories by ERC in code and payloads</td><td>Hard-coding numeric category IDs, which differ per environment</td></tr>
 </table></div>
 
 <h2>Traps</h2>
 <div class="callout warn">
 	<b>Site-scoped vocabularies do not cross sites</b>
-	<p>A collection on Site A cannot filter by a category defined on Site B. If content is shared, the vocabulary must be at instance scope &mdash; and moving it later means re-tagging.</p>
+	<p>A collection on Site A can't filter by a category defined only on Site B. If content is shared, put the vocabulary in the Global site or in an asset library connected to both. Moving it later means re-categorising.</p>
 </div>
 <div class="callout warn">
 	<b>Deleting a category silently un-filters content</b>
 	<p>Items lose the association and drop out of every dynamic collection that filtered on it. The pages still render, just with fewer items.</p>
 </div>
 <div class="callout warn">
+	<b>Numeric IDs are per environment</b>
+	<p>Category <code>43120</code> on your laptop is a different number on UAT. A collection, fragment configuration or API call that hard-codes it passes review and fails after deployment. Resolve it by ERC, or through the initializer token.</p>
+</div>
+<div class="callout warn">
 	<b>Tags are typo magnets</b>
-	<p><em>onboarding</em>, <em>on-boarding</em> and <em>Onboarding</em> are three different tags. Anything load-bearing belongs in a vocabulary.</p>
+	<p><em>onboarding</em>, <em>on-boarding</em> and <em>onboard</em> are three different tags, and case handling is not something to rely on either. Anything load-bearing belongs in a vocabulary.</p>
+</div>
+<div class="callout note">
+	<b>In the new Liferay CMS</b>
+	<p>The object-based Liferay CMS (behind the <code>CMS</code> flag in 2026.Q2, GA in 2026.Q3) keeps categories and tags. You can scope categories to a single <b>space</b> or share them across spaces. The modelling advice above carries over unchanged.</p>
 </div>
 		<footer class="pagefoot">
 			Part of the <a href="index.html">Liferay Component Guide</a>.

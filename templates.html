@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>All template types · Liferay Component Guide</title>
-<meta name="description" content="Liferay calls at least seven unrelated things a "template". Here they are side by side, with what each one templates and when to reach for it.">
+<meta name="description" content="Liferay calls at least nine unrelated things a "template". Here they are side by side, with what each one templates and when to reach for it.">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -54,7 +54,7 @@
 	</nav>
 	<main id="main">
 		<h1>All template types</h1>
-		<p class="lede">Liferay calls at least seven unrelated things a "template". Here they are side by side, with what each one templates and when to reach for it.</p>
+		<p class="lede">Liferay calls at least nine unrelated things a "template". Here they are side by side, with what each one templates and when to reach for it.</p>
 
 <h2>The disambiguation table</h2>
 <p>Read this table first. Almost every "which template do I need" question is answered by the middle column.</p>
@@ -64,7 +64,8 @@
 	<tr><td><a href="#display">Display Page Template</a></td><td>The <b>full page around one item</b>, with a generated URL</td><td>Each article/record needs its own permalink</td></tr>
 	<tr><td><a href="#pagetemplate">Page Template</a></td><td>A <b>starting layout</b> copied into new pages</td><td>Editors keep rebuilding the same page shape</td></tr>
 	<tr><td><a href="#master">Master Page Template</a></td><td>The <b>persistent chrome</b> around every page</td><td>One header and footer across the site</td></tr>
-	<tr><td><a href="#adt">Application Display Template</a></td><td>A <b>widget's list output</b></td><td>The Asset Publisher's markup is wrong for your design</td></tr>
+	<tr><td><a href="#infotemplate">Information Template</a></td><td>How <b>one item of any type</b> renders inside a mapped fragment field</td><td>A fragment on a display page or collection should render a whole item with FreeMarker</td></tr>
+	<tr><td><a href="#adt">Widget Template (ADT)</a></td><td>A <b>widget's list output</b></td><td>The Asset Publisher's markup is wrong for your design</td></tr>
 	<tr><td><a href="#notification">Notification Template</a></td><td>An <b>email / notification body</b></td><td>"Send a styled email when X happens"</td></tr>
 	<tr><td><a href="#formtemplate">Form / fragment templates</a></td><td>Reusable <b>fragment compositions</b></td><td>A named group of fragments editors reuse</td></tr>
 	<tr><td><a href="#sitetemplate">Site Template / Site Initializer</a></td><td>A <b>whole site</b></td><td>Spinning up many similar sites, or version-controlling one</td></tr>
@@ -77,22 +78,35 @@
               └── COLLECTION DISPLAY
                   └── WEB CONTENT TEMPLATE   ← templates one item inside the list
   DISPLAY PAGE TEMPLATE                ← templates the page generated per item
-  ADT                                  ← templates one widget's output
+  INFORMATION TEMPLATE                 ← templates one item inside a mapped fragment field
+  WIDGET TEMPLATE (ADT)                ← templates one widget's output
   NOTIFICATION TEMPLATE                ← templates an email, not a page at all</div>
 
 <h2 id="webcontent">1. Web Content Template <span class="tag">FreeMarker</span></h2>
 <p>Bound to a <a href="content-structures.html">Content Structure</a>. Receives one article's field values, emits HTML. Full detail on its own page: <a href="web-content-templates.html">Web Content Templates</a>.</p>
 <p><b>Relations:</b> <a href="content-structures.html">structure</a> supplies the fields &middot; <a href="web-content.html">articles</a> supply the data &middot; used by the Web Content Display widget, by <a href="collections.html">collections</a>, and inside <a href="#display">display pages</a>.</p>
+<p>In a <a href="site-initializers.html">site initializer</a>: <code>ddm-templates/&lt;name&gt;/ddm-template.json</code> (<code>ddmTemplateKey</code>, <code>ddmStructureKey</code>, <code>name</code>) plus <code>ddm-template.ftl</code>.</p>
 
 <h2 id="display">2. Display Page Template</h2>
 <p>The one that saves the most work and is most often missed. A display page template is bound to a <b>content type + subtype</b>, and every item of that type automatically gets its own URL rendered through it.</p>
 <div class="wrap"><table>
 	<tr><th>Entity</th><th>contentType</th><th>contentSubtype</th></tr>
-	<tr><td>Web Content</td><td><code>com.liferay.journal.model.JournalArticle</code></td><td>the content structure's ERC</td></tr>
-	<tr><td><a href="objects.html">Object entry</a></td><td><code>com.liferay.object.model.ObjectEntry</code></td><td>the object definition's ERC</td></tr>
-	<tr><td>Blog post</td><td><code>com.liferay.blogs.model.BlogsEntry</code></td><td>(empty)</td></tr>
-	<tr><td><a href="documents-media.html">Document</a></td><td><code>com.liferay.portal.kernel.repository.model.FileEntry</code></td><td>(empty)</td></tr>
+	<tr><td>Web Content</td><td><code>com.liferay.journal.model.JournalArticle</code></td><td>the content structure's key (<code>{"subtypeKey": "ARTICLE"}</code>)</td></tr>
+	<tr><td><a href="objects.html">Object entry</a></td><td><code>com.liferay.object.model.ObjectDefinition#&lt;id&gt;</code>. In an initializer, use <code>[$OBJECT_DEFINITION_CLASS_NAME:&lt;ObjectName&gt;$]</code></td><td>(none) &mdash; the class name already identifies the object</td></tr>
+	<tr><td>Blog post</td><td><code>com.liferay.blogs.model.BlogsEntry</code></td><td>(none)</td></tr>
+	<tr><td><a href="documents-media.html">Document</a></td><td><code>com.liferay.portal.kernel.repository.model.FileEntry</code></td><td>optional: a document type</td></tr>
 </table></div>
+<p>In a site initializer this is <code>layout-page-templates/display-page-templates/&lt;name&gt;/display-page-template.json</code> plus the usual <code>page-definition.json</code>:</p>
+<pre><code>{
+	"contentSubtype": { "subtypeKey": "BADAEL-NEWS" },
+	"contentType": { "className": "com.liferay.journal.model.JournalArticle" },
+	"defaultTemplate": true,
+	"name": "News Article"
+}</code></pre>
+<div class="callout trap">
+	<b>Each object is its own class name</b>
+	<p>Every object definition registers its own class name, <code>com.liferay.object.model.ObjectDefinition#&lt;objectDefinitionId&gt;</code>. The ID differs per environment, which is why initializers use the <code>OBJECT_DEFINITION_CLASS_NAME</code> token. A plain <code>com.liferay.object.model.ObjectEntry</code> matches nothing.</p>
+</div>
 <p>Inside it, fragments <b>map</b> to the current item rather than to a fixed article. In a FreeMarker fragment the item is available as:</p>
 <pre><code>[#assign entryId = (request.getAttribute("INFO_ITEM").objectEntryId)! /]</code></pre>
 <p>Only one template per <code>contentType</code>+<code>contentSubtype</code> can be the default; that default is what an item's URL uses when no template is named in the path.</p>
@@ -107,10 +121,11 @@
 	<b>Copy, not link</b>
 	<p>Editing a page template later does <em>not</em> change pages already created from it. If you need changes to propagate, the content belongs on a <a href="#master">master page</a> instead, which <em>is</em> a live link.</p>
 </div>
-<p>Lives in a <a href="site-initializers.html">site initializer</a> under <code>layout-page-templates/</code>, as a <code>page-template.json</code> plus a <code>page-definition.json</code>.</p>
+<p>Page templates always belong to a <b>page template set</b> (collection). In a <a href="site-initializers.html">site initializer</a> that becomes <code>layout-page-templates/page-templates/&lt;set&gt;/page-template-collection.json</code>, with one folder per template holding a <code>page-template.json</code> and a <code>page-definition.json</code>. There are two flavours: <b>content page</b> templates (fragments, the default) and <b>widget page</b> templates (a classic layout plus portlets).</p>
 
 <h2 id="master">4. Master Page Template</h2>
-<p>The persistent frame around content pages: header, navigation, footer. Each page that uses the master injects its own content into the master's <b>DropZone</b>.</p>
+<p>The persistent frame around content pages: header, navigation, footer. Each page that uses the master injects its own content into the master's <b>DropZone</b>. The DropZone's <code>fragmentSettings</code> can also limit which fragments editors may drop into pages that use this master.</p>
+<p>In an initializer: <code>layout-page-templates/master-pages/&lt;master-name&gt;/</code> containing <code>master-page.json</code> (just <code>{"name": "&hellip;"}</code>) and <code>page-definition.json</code>. The <b>directory name is the master's key</b>.</p>
 <pre><code>{
 	"pageElement": {
 		"pageElements": [
@@ -133,8 +148,12 @@
 	<p>If the theme's own header is still on, your master's header renders under it. Switch the stock chrome off in <code>layout-set/public/metadata.json</code> (<code>lfr-theme:regular:show-header</code> / <code>show-footer</code>) rather than hiding it with CSS &mdash; see <a href="theme-design.html">Themes</a>.</p>
 </div>
 
-<h2 id="adt">5. Application Display Template (ADT)</h2>
-<p>FreeMarker that overrides a <em>widget's</em> markup &mdash; Asset Publisher, Documents and Media, Categories Navigation, Breadcrumb, Site Map, Language selector, Knowledge Base.</p>
+<h2 id="infotemplate">5. Information Template <span class="tag">FreeMarker</span></h2>
+<p>The newer, type-agnostic cousin of the web content template. Created in <em>Site Menu &rarr; Design &rarr; Templates &rarr; Information Templates</em> for an <b>item type</b> (web content, document, blog, category, object, &hellip;) and optionally a subtype. It then appears as a mappable "field" of that item. Map a fragment's HTML editable to it in a <a href="#display">display page</a> or a <a href="collections.html">collection</a> item, and the whole item renders through your FreeMarker.</p>
+<p>Use it when you want web-content-template-style control over an <a href="objects.html">object entry</a> or a document, which have no web content templates. The limitation is that it's <b>fragment-only</b>: widgets can't use it. <code>restClient</code> is available here too. In an initializer, it is a <code>ddm-templates/</code> entry whose <code>className</code> is <code>com.liferay.template.model.TemplateEntry</code>, with <code>infoItemClassName</code> / <code>infoItemKey</code>.</p>
+
+<h2 id="adt">6. Widget Template (formerly Application Display Template, ADT)</h2>
+<p>FreeMarker that overrides a <em>widget's</em> markup: Asset Publisher, Documents and Media, Categories Navigation, Breadcrumb, Site Map, Language selector, Navigation Menu, search results, Knowledge Base. The UI calls them <b>Widget Templates</b> (<em>Site Menu &rarr; Design &rarr; Templates &rarr; Widget Templates</em>). You apply one in the widget's <em>Configuration &rarr; Display Template</em>. Since 7.4 they are FreeMarker only; Velocity is gone. The ADT name survives in code and older docs.</p>
 <pre><code>&lt;#if entries?has_content&gt;
 	&lt;ul&gt;
 		&lt;#list entries as curEntry&gt;
@@ -147,16 +166,17 @@
 	<p>ADTs belong to the <a href="widgets-modules.html">widget</a> era. On a modern content page, a <a href="collections.html">Collection Display</a> fragment plus a card template does the same job with a better editor experience. Write ADTs when you are stuck with a widget that has no fragment equivalent.</p>
 </div>
 
-<h2 id="notification">6. Notification Template</h2>
-<p>The body of an email or in-app notification, with token interpolation rather than FreeMarker:</p>
-<pre><code>Hello [%USER_FIRST_NAME%], your request [%OBJECT_FIELD_requestId%] was approved.</code></pre>
+<h2 id="notification">7. Notification Template</h2>
+<p>The body of an email or in-app notification. By default it uses <b>term</b> interpolation, where each term is <code>[%OBJECTNAME_FIELDNAME%]</code> in upper case. Copy terms from the editor's <em>Definition of Terms</em> panel rather than typing them:</p>
+<pre><code>Your request [%BADAELREQUEST_REQUESTID%] was approved.</code></pre>
+<p>Email templates can also switch the editor type to <b>FreeMarker</b> when you need loops or conditionals.</p>
 <p>Created via <code>POST /o/notification/v1.0/notification-templates</code> and referenced by ID from a <a href="workflow.html#actions">notification object action</a>. Details on <a href="workflow.html#notifications">Workflow &amp; notifications</a>.</p>
 
-<h2 id="formtemplate">7. Fragment compositions &amp; form templates</h2>
+<h2 id="formtemplate">8. Fragment compositions &amp; form templates</h2>
 <p>Editors can select several fragments on a page and save them as a <b>composition</b> &mdash; a named, reusable group that appears in the fragment sidebar. Useful for "our standard CTA block". Like <a href="#pagetemplate">page templates</a>, compositions are copied on use, not linked.</p>
 <p>The <a href="forms.html">Form Container</a> plays a similar role for forms: a container bound to an <a href="objects.html">Object</a>, filled with <code>INPUTS-*</code> fragments.</p>
 
-<h2 id="sitetemplate">8. Site Template vs Site Initializer</h2>
+<h2 id="sitetemplate">9. Site Template vs Site Initializer</h2>
 <div class="wrap"><table>
 	<tr><th></th><th>Site Template</th><th><a href="site-initializers.html">Site Initializer</a></th></tr>
 	<tr><td>Defined in</td><td>The running instance's UI</td><td>A version-controlled CET source tree</td></tr>
@@ -172,7 +192,8 @@
 	<li>Every item needs a URL &rarr; <a href="#display">Display Page Template</a></li>
 	<li>Same starting layout for new pages &rarr; <a href="#pagetemplate">Page Template</a></li>
 	<li>Same header/footer everywhere, live &rarr; <a href="#master">Master Page Template</a></li>
-	<li>A widget's HTML is wrong &rarr; <a href="#adt">ADT</a></li>
+	<li>A fragment should render a whole object entry / document / item with FreeMarker &rarr; <a href="#infotemplate">Information Template</a></li>
+	<li>A widget's HTML is wrong &rarr; <a href="#adt">Widget Template (ADT)</a></li>
 	<li>An email body &rarr; <a href="#notification">Notification Template</a></li>
 	<li>The whole site, rebuildable from git &rarr; <a href="site-initializers.html">Site Initializer</a></li>
 </ul>

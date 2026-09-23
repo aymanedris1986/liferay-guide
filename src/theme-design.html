@@ -13,16 +13,44 @@
 
 <h2 id="stylebook">Style books</h2>
 <p>A style book is a named set of <b>frontend token</b> values. The theme declares which tokens exist (a <em>frontend token definition</em>); the style book sets them; every page using that style book picks up the values without a deploy.</p>
+
+<h3>How the pieces fit</h3>
+<div class="ascii">  THEME  (Classic, or a themeCSS CET)
+     └── frontend-token-definition.json    which tokens exist, their editor type,
+                                            default, and the CSS variable each maps to
+                  │
+                  ▼
+  STYLE BOOK  (bound to that theme via themeId)
+     └── frontend-tokens-values.json        this site's values for those tokens
+                  │
+                  ▼
+  :root { --brand-color-1: #0b5fff; --font-family-base: Tajawal, sans-serif; … }
+                  │
+                  ▼
+  Clay/Bootstrap CSS + your fragment CSS read var(--…)</div>
+
+<h3>Style book files in an initializer</h3>
+<p>The values live in a <em>separate file</em> that <code>style-book.json</code> points to &mdash; <code>StyleBookEntryZipProcessorImpl</code> reads <code>frontendTokensValuesPath</code>, not an inline object:</p>
 <pre><code>style-books/badael-brand/style-book.json
 {
 	"defaultStyleBookEntry": true,
-	"frontendTokensValues": {
-		"brandColor1": { "value": "#0b5fff" },
-		"fontFamily1": { "value": "Tajawal, sans-serif" },
-		"borderRadius": { "value": "8px" }
-	},
-	"name": "Badael Brand"
+	"frontendTokensValuesPath": "frontend-tokens-values.json",
+	"name": "Badael Brand",
+	"themeId": "classic_WAR_classictheme",
+	"thumbnailPath": "thumbnail.png"
+}
+
+style-books/badael-brand/frontend-tokens-values.json
+{
+	"brandColor1": { "cssVariableMapping": "brand-color-1", "value": "#0b5fff" },
+	"fontFamilyBase": { "cssVariableMapping": "font-family-base", "value": "Tajawal, sans-serif" },
+	"borderRadius": { "cssVariableMapping": "border-radius", "value": "8px" }
 }</code></pre>
+<p>The keys (<code>brandColor1</code>, <code>fontFamilyBase</code>) are token <em>names</em> from the theme's <code>frontend-token-definition.json</code>; <code>cssVariableMapping</code> is the CSS variable without the leading <code>--</code>. Values may reference other tokens: <code>"value": "var(--gray-900)"</code>.</p>
+<div class="callout trap">
+	<b>Inline values and invented token names are silently ignored</b>
+	<p>An inline <code>frontendTokensValues</code> object in <code>style-book.json</code> is not read at all &mdash; the style book imports with no values and the site looks stock. A token name the theme does not define (Classic has no <code>fontFamily1</code>; it has <code>fontFamilyBase</code>, <code>fontFamilySansSerif</code>, <code>fontFamilyMonospace</code>) is likewise ignored. Copy names from the theme's definition, and after provisioning open the style book in the UI to check the values actually took.</p>
+</div>
 <div class="callout good">
 	<b>Prefer style books for anything a designer will change</b>
 	<p>No deploy, no restart, editable in the UI, versionable in the tree, and it survives reprovisioning. It is the cheapest rung on the <a href="decision-guide.html">cost ladder</a> for appearance.</p>
@@ -31,8 +59,14 @@
 <pre><code>.badael-hero {
 	background: var(--brand-color-1);
 	border-radius: var(--border-radius);
-	font-family: var(--font-family-1);
+	font-family: var(--font-family-base);
+	padding: var(--spacer-5);
 }</code></pre>
+<p>Classic's token categories, for orientation: colour system (brand colours, grays, theme colours such as <code>--primary</code>), spacing (<code>--spacer-0</code> &hellip; <code>--spacer-10</code>), general (body, borders, shadows), layout (container widths), typography (font families, sizes, weights, <code>--h1-font-size</code> &hellip; <code>--h6-font-size</code>), and buttons (<code>--btn-primary-background-color</code> and friends). If a design needs something outside that list, that is your signal for a <a href="#themecss">themeCSS CET</a> with its own token definition.</p>
+<div class="callout note">
+	<b>Which style book wins</b>
+	<p>A page can pick a style book explicitly; otherwise it inherits from its <a href="templates.html#master">master page</a>, and otherwise the site's default (<code>defaultStyleBookEntry: true</code>). A style book only makes sense for the theme whose tokens it sets, which is why it carries <code>themeId</code>.</p>
+</div>
 
 <h2 id="themecss">themeCSS client extensions</h2>
 <p>The modern replacement for the legacy theme WAR. It ships compiled CSS &mdash; typically Clay variable overrides &mdash; and appears in the theme picker.</p>
@@ -43,31 +77,33 @@
 badael-home-theme-css:
     clayRTLURL: css/clay_rtl.css
     clayURL: css/clay.css
+    frontendTokenDefinitionJSON: src/frontend-token-definition.json
     mainRTLURL: css/main_rtl.css
     mainURL: css/main.css
     name: Badael Home Theme CSS
     type: themeCSS</code></pre>
+<p><code>frontendTokenDefinitionJSON</code> is optional and is what makes a themeCSS CET work with style books: it declares the tokens the CET's CSS reads, in the same format as Classic's definition. Each token has a <code>name</code>, a <code>defaultValue</code>, an <code>editorType</code> (<code>ColorPicker</code>, <code>Length</code>, &hellip;) and a <code>mappings</code> entry of <code>{"type": "cssVariable", "value": "btn-border-radius"}</code>. Without it, a style book edited while your CET is applied has nothing of yours to set.</p>
 <p>The RTL URLs matter for Arabic-language sites: Liferay serves the RTL sheet when the locale direction is right-to-left, and omitting them means an LTR layout under Arabic.</p>
 
 <div class="callout trap" id="trap">
 	<b>A themeCSS CET cannot be selected from the initializer tree</b>
 	<p>Liferay attaches a theme through a <code>ClientExtensionEntryRel</code> on the layout, master layout, or layout set. <code>BundleSiteInitializer</code> has <b>no handler</b> that creates that relation, and there is no key in <code>metadata.json</code> for it either.</p>
 	<p>So a deployed themeCSS CET is <em>available</em> but not <em>applied</em> until someone picks it in <b>Site Administration &rarr; Design &rarr; Theme</b> &mdash; and that selection is lost on <b>every reprovision</b>.</p>
-	<p><b>Plan accordingly.</b> Appearance that must survive delete-and-redeploy has to come from things the tree can express: a style book with <code>defaultStyleBookEntry: true</code>, the <a href="templates.html#master">master page</a>, fragment CSS, and layout-set settings. Reach for themeCSS for Clay-level overrides that have no token &mdash; Classic exposes no <code>headings*</code> tokens, for instance &mdash; and say plainly that applying it needs a manual step.</p>
+	<p><b>Plan accordingly.</b> Appearance that must survive delete-and-redeploy has to come from things the tree can express: a style book with <code>defaultStyleBookEntry: true</code>, the <a href="templates.html#master">master page</a>, fragment CSS, and layout-set settings. Reach for themeCSS for Clay-level overrides that have no token &mdash; Classic's headings tokens are sizes only (<code>h1FontSize</code>&hellip;<code>h6FontSize</code>); there is no heading font family, weight or colour token, for instance &mdash; and say plainly that applying it needs a manual step.</p>
 </div>
 
 <h2>Layout set settings</h2>
 <p>Switching off stock theme chrome so your master page's header and footer do not render <em>underneath</em> the theme's:</p>
 <pre><code>layout-set/public/metadata.json
 {
-	"colorSchemeId": "01",
 	"settings": {
 		"lfr-theme:regular:show-footer": false,
 		"lfr-theme:regular:show-header": false,
 		"lfr-theme:regular:show-header-search": false
 	},
-	"themeId": "classic_WAR_classictheme"
+	"themeName": "Classic"
 }</code></pre>
+<p>What the 2026.Q2 layout-set handler actually reads: <code>themeName</code> (the theme's display name, matched exactly), <code>settings</code> (copied into the layout set's settings), and three optional sibling files &mdash; <code>css.css</code> (layout-set custom CSS), <code>js.js</code> (layout-set JavaScript) and <code>logo.png</code> (site logo). It does <b>not</b> read <code>themeId</code> or <code>colorSchemeId</code>; those keys are ignored.</p>
 <div class="callout note">
 	<b>Prefer this over CSS hiding</b>
 	<p>Hiding <code>#banner</code> / <code>#footer</code> with a <a href="client-extensions.html#globalcss">globalCSS</a> rule is instance-wide, and there is no site-specific <code>body</code> class to scope it to &mdash; so you would hide the chrome on every other site too. The setting is scoped to this layout set.</p>
@@ -83,7 +119,7 @@ badael-home-theme-css:
 	<tr><td>Theme settings</td><td>Style book + layout-set settings</td></tr>
 	<tr><td>Theme JS</td><td><a href="client-extensions.html#globaljs">globalJS CET</a></td></tr>
 </table></div>
-<p>Do not start a new project on a theme WAR. It blocks SaaS and makes every upgrade a re-test.</p>
+<p>Do not start a new project on a theme WAR. It blocks SaaS and makes every upgrade a re-test. The same goes for the bundled alternatives: the <b>Dialect</b> theme is archived and removed from the default build in 2026.Q3 &mdash; Classic plus style books plus themeCSS is the supported path.</p>
 
 <h2>Accessibility &mdash; check these while you still can change them</h2>
 <ul>
@@ -107,6 +143,10 @@ badael-home-theme-css:
 <div class="callout warn">
 	<b>A frontend project cannot live in the initializer project</b>
 	<p><code>themeCSS</code> is classified <code>frontend</code>; <code>siteInitializer</code> is <code>batch</code>. The workspace plugin forbids the combination. Sibling projects &mdash; see <a href="client-extensions.html#grouping">grouping rules</a>.</p>
+</div>
+<div class="callout warn">
+	<b>A token in the wrong place does nothing, quietly</b>
+	<p>Style-book values arrive as CSS custom properties. Fragment CSS that hard-codes <code>#0b5fff</code> will never follow the brand; fragment CSS that redefines <code>--brand-color-1</code> overrides the style book wherever that rule matches, and nobody editing the style book will know why. Read tokens in fragments, never write them.</p>
 </div>
 <div class="callout warn">
 	<b>A flat handler timing does not mean it failed</b>

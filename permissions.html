@@ -61,17 +61,43 @@
     │                            │
     └──────assigned──────▶  ROLE ──────grants──────▶ ACTION on RESOURCE at SCOPE
                              │                        (VIEW, UPDATE, ADD_ENTRY…)
-             ┌───────────────┼───────────────┐
-        Regular role    Site role      Organization role
-        (portal-wide)   (per site)     (per org)</div>
+     ┌──────────┬──────────┼───────────┬──────────────┐
+  Regular     Site     Organization  Account     Asset library
+  (instance)  (a site) (an org)      (an account) (a library)</div>
 <div class="wrap"><table>
 	<tr><th>Role type</th><th>Applies</th><th>Use for</th></tr>
-	<tr><td>Regular</td><td>Everywhere in the instance</td><td>Administrator, HR Manager (global)</td></tr>
-	<tr><td>Site</td><td>Within one site</td><td>Site Content Editor, Site Member</td></tr>
-	<tr><td>Organization</td><td>Within one org and optionally its children</td><td>Department Head</td></tr>
-	<tr><td>Account</td><td>Within a B2B account</td><td>Commerce buyer, account admin</td></tr>
+	<tr><td>Regular</td><td>Everywhere in the instance</td><td>Administrator, HR Manager (global), anything cross-site</td></tr>
+	<tr><td>Site</td><td>Within the site(s) where the user was given it</td><td>Site Content Reviewer, Site Administrator</td></tr>
+	<tr><td>Organization</td><td>Within the organization the user was given it for, and that organization's site</td><td>Department Head, Organization Administrator</td></tr>
+	<tr><td>Account</td><td>Within one <a href="objects.html#system-objects">account</a> (B2B/B2C)</td><td>Buyer, Account Administrator; and account-restricted object entries</td></tr>
+	<tr><td>Asset library</td><td>Within one <a href="documents-media.html">asset library</a> (called <code>depot</code> in code and workflow XML)</td><td>Asset Library Content Reviewer</td></tr>
 </table></div>
-<p>Two roles exist that you never assign: <b>Guest</b> (anyone not signed in) and <b>User</b> (anyone signed in). Guest is where the interesting failures live.</p>
+<p>There is also a <b>Publications</b> role type, used only by the Publications (change-list) feature. The type is chosen when you create the role and cannot change: a regular role cannot be "given in one site", and a site role grants nothing outside the sites where it is assigned. That is the most common reason a role "does not work": right permissions, wrong type.</p>
+
+<h3>The implicit roles</h3>
+<p>Some roles are never assigned by hand; Liferay decides membership at runtime:</p>
+<div class="wrap"><table>
+	<tr><th>Role</th><th>Who has it</th><th>Why it matters</th></tr>
+	<tr><td><b>Guest</b></td><td>Anyone not signed in &mdash; <em>and</em>, by default, everyone signed in too</td><td>See the callout below</td></tr>
+	<tr><td><b>User</b></td><td>Every signed-in user</td><td>"Any authenticated user" grants, instance-wide</td></tr>
+	<tr><td><b>Site Member</b></td><td>Members of the current site</td><td>A site role; "our intranet's staff" grants go here, not on User</td></tr>
+	<tr><td><b>Organization User</b></td><td>Members of the current organization</td><td>The organization equivalent of Site Member</td></tr>
+	<tr><td><b>Owner</b></td><td>The creator of the specific item being checked</td><td>Why authors can see and edit their own entries &mdash; and why testing as the author proves nothing</td></tr>
+</table></div>
+<div class="callout note">
+	<b>Signed-in users inherit Guest</b>
+	<p><code>permissions.check.guest.enabled=true</code> (the default in <code>portal.properties</code>) makes permission checks assume every user also has the Guest role. So a Guest VIEW grant is effectively a grant to everyone, and you never need to repeat it on User. The reverse is not true: a Site Member grant does nothing for visitors. Guest is where the interesting failures live.</p>
+</div>
+
+<h3>Resources, actions and where a grant is stored</h3>
+<p>Every permissionable thing is a <b>resource</b> with a fixed list of <b>actions</b>, declared in the module's resource-actions XML. There are three kinds:</p>
+<div class="wrap"><table>
+	<tr><th>Kind</th><th>Example</th><th>Typical actions</th></tr>
+	<tr><td>Portlet (application)</td><td>The Web Content admin app, an object's admin app</td><td><code>ACCESS_IN_CONTROL_PANEL</code>, <code>ADD_TO_PAGE</code>, <code>CONFIGURATION</code></td></tr>
+	<tr><td>Root model ("the app's data as a whole")</td><td><code>com.liferay.journal</code>, <code>com.liferay.object#&lt;id&gt;</code></td><td><code>ADD_ARTICLE</code>, <code>ADD_OBJECT_ENTRY</code>, <code>PERMISSIONS</code></td></tr>
+	<tr><td>Model (one item)</td><td>A web content article, an object entry, a page</td><td><code>VIEW</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>PERMISSIONS</code></td></tr>
+</table></div>
+<p>A grant is a row saying "role R may do action A on resource N at scope S" &mdash; the <a href="#scope">scope</a> is covered below. The XML also declares <b>defaults</b> (what Guest, Site Member and Owner get on each <em>new</em> item) and <b>guest-unsupported</b> actions, which the UI and API refuse to grant to Guest at all.</p>
 
 <h2 id="guest">Guest access &mdash; the failure mode</h2>
 <div class="callout trap">
@@ -100,10 +126,14 @@ com.liferay.headless.delivery.internal.resource.v1_0.NavigationMenuResourceImpl#
 <p>The action decides which resource name to grant on. Getting this wrong applies cleanly and grants nothing.</p>
 <div class="wrap"><table>
 	<tr><th>Resource</th><th>Actions</th><th>Guest may hold</th></tr>
-	<tr><td><code>com.liferay.object.model.ObjectEntry#&lt;id&gt;</code> &mdash; what <code>[$OBJECT_DEFINITION_CLASS_NAME:X$]</code> resolves to</td><td>VIEW, UPDATE, DELETE, PERMISSIONS</td><td>VIEW</td></tr>
-	<tr><td><code>com.liferay.object#&lt;id&gt;</code> &mdash; written <code>com.liferay.object#[$OBJECT_DEFINITION_ID:X$]</code></td><td>ADD_OBJECT_ENTRY, PERMISSIONS</td><td>ADD_OBJECT_ENTRY</td></tr>
+	<tr><td><code>com.liferay.object.model.ObjectDefinition#&lt;id&gt;</code> &mdash; the entry model; what <code>[$OBJECT_DEFINITION_CLASS_NAME:X$]</code> resolves to</td><td>VIEW, UPDATE, DELETE, PERMISSIONS (plus extras such as <code>OBJECT_ENTRY_HISTORY</code> when enabled)</td><td>VIEW</td></tr>
+	<tr><td><code>com.liferay.object#&lt;id&gt;</code> &mdash; the root resource; written <code>com.liferay.object#[$OBJECT_DEFINITION_ID:X$]</code></td><td>ADD_OBJECT_ENTRY, PERMISSIONS</td><td>ADD_OBJECT_ENTRY</td></tr>
 </table></div>
-<p>UPDATE, DELETE and PERMISSIONS are <em>guest-unsupported</em> &mdash; ungrantable to Guest at any scope.</p>
+<p>Yes, the <em>entry</em> resource is named after <code>ObjectDefinition</code>: every custom object's class name is <code>com.liferay.object.model.ObjectDefinition#</code> plus the definition id. UPDATE, DELETE and PERMISSIONS are <em>guest-unsupported</em> &mdash; ungrantable to Guest at any scope.</p>
+<div class="callout trap">
+	<b>New objects have no defaults at all</b>
+	<p>The resource-actions template Liferay generates for every custom object has empty <code>guest-defaults</code> and empty <code>site-member-defaults</code>. Web content, by contrast, gives Guest VIEW on new articles by default. So the habit "content is public unless I restrict it" is exactly backwards for objects: entries are private to their owner and admins until you grant VIEW.</p>
+</div>
 
 <h2 id="scope">Granting in source: <code>resource-permissions.json</code></h2>
 <pre><code>[
@@ -132,8 +162,22 @@ com.liferay.headless.delivery.internal.resource.v1_0.NavigationMenuResourceImpl#
 	<p>A bad <code>resourceName</code> or unknown <code>roleName</code> logs <em>"No resource action found"</em> / <em>"No role found"</em> and carries on. A silent 2&nbsp;ms run with no warning means the grant applied as written &mdash; so if behaviour did not change, suspect <code>scope</code>, not the syntax.</p>
 </div>
 
+<h2 id="inheritance">Inheritance: less than you expect</h2>
+<p>Liferay permissions are not a file-system ACL. Almost nothing flows down automatically:</p>
+<ul>
+	<li><b>Grants do not propagate.</b> Setting permissions on a folder does not rewrite the permissions of the documents in it (<code>permissions.propagation.enabled=false</code> by default). Existing items keep what they had.</li>
+	<li><b>VIEW is checked up the tree.</b> With <code>permissions.view.dynamic.inheritance=true</code> (the default), seeing a document also requires VIEW on its folder and every parent folder; the same for categories. So one restricted folder hides everything below it, whatever the items themselves say.</li>
+	<li><b>New items copy defaults once.</b> Defaults from the resource-actions XML (or the "Permissions" section of the create form) are copied onto the item when it is created. Changing defaults later does not touch existing items &mdash; which is why the company-scope grant below exists.</li>
+	<li><b>Page VIEW does not imply content VIEW.</b> A visitor can open a public page and see an empty list because they cannot VIEW the entries on it.</li>
+</ul>
+
 <h2>Per-entry permissions</h2>
-<p>Object entries can be permissioned individually via the <b>collaborators</b> API &mdash; "only the requester and their manager can see this leave request". Requires feature flag <code>LPD-17564</code>.</p>
+<p>Individual object entries can carry their own grants, like any model resource, through the entry's Permissions action in the admin app or over REST at <code>/o/c/&lt;plural&gt;/{id}/permissions</code>. For "only the requester and their manager can see this leave request" there are three routes, in order of preference:</p>
+<ol>
+	<li><b>Don't grant VIEW broadly</b> and rely on <b>Owner</b>: the requester sees their own entries, a role such as HR sees all.</li>
+	<li><b>Account restriction</b>: relate the object to Account and restrict it, so entries are visible only inside their account.</li>
+	<li>The <b>collaborators</b> API (<code>/o/c/&lt;plural&gt;/{id}/collaborators</code>, built on the Sharing framework) to share one entry with named users. It is gated by feature flag <code>LPD-17564</code>, whose title in 2026.Q2 is <b>"CMS"</b> (the new headless CMS) and which depends on <code>LPD-34594</code> (Root Object Definitions). Both are off by default &mdash; treat this as preview.</li>
+</ol>
 
 <h2>How to verify &mdash; as the visitor, not as you</h2>
 <pre><code># curl with no --user and no cookie jar IS a Guest request

@@ -62,17 +62,17 @@
 	<tr>
 		<td>Marketing copy, news articles, hero text, FAQs &mdash; written by editors, translated, versioned, approved</td>
 		<td><a href="web-content.html">Web Content</a> + <a href="content-structures.html">Content Structure</a></td>
-		<td>An Object gives you no versioning, no translation UI, and no rich-text editing worth the name</td>
+		<td>Objects do have localizable fields (2023.Q3+) and a Rich Text field type, but not the editorial kit: no compare/restore versions (on 2026.Q2 object entry versioning only comes with the flagged new CMS), no display/expiration/review dates, and no side-by-side translation workflow</td>
 	</tr>
 	<tr>
 		<td>Leave requests, tickets, assets, employees &mdash; records with fields, relations, status, validation</td>
 		<td><a href="objects.html">Object</a></td>
-		<td>Web Content has no relationships, no queryable fields, and no per-record permissions worth using</td>
+		<td>Web Content has no real relationships, and its fields live in generic DDM tables rather than typed columns, so you can't aggregate, validate across fields, or query them as data</td>
 	</tr>
 	<tr>
 		<td>PDFs, images, videos, policy documents</td>
 		<td><a href="documents-media.html">Documents &amp; Media</a></td>
-		<td>Storing binaries as Object fields loses the preview, the checkout/versioning, and the CDN path</td>
+		<td>An Object attachment field stores the file in D&amp;M anyway, but you lose the library UI, document types, and a first-class place for folders and permissions. Use D&amp;M directly and reference the file</td>
 	</tr>
 	<tr>
 		<td>A fixed list of options: status values, departments, priorities</td>
@@ -82,7 +82,7 @@
 	<tr>
 		<td>Labels used to group and filter content across types</td>
 		<td><a href="taxonomy.html">Categories</a> (vocabulary) or tags</td>
-		<td>A field on the structure cannot be filtered on by a <a href="collections.html">dynamic collection</a></td>
+		<td>A dynamic collection <em>can</em> filter on one structure field (Item Subtype &rarr; Filter by Field), but only within that one structure. Categories cut across every content type and can be combined, and editors can manage them</td>
 	</tr>
 	<tr>
 		<td>Data that lives in SAP, an external DB, or another SaaS</td>
@@ -124,8 +124,24 @@
 	<tr><td>Object definitions, fields, relationships, picklists</td><td>Yes</td><td>Initializer <code>object-definitions/</code>, or the <a href="headless-apis.html">object-admin API</a> in a script</td></tr>
 	<tr><td>Object <em>entries</em> (runtime data)</td><td>Seed only</td><td><code>object-entries/</code> seeds; real data never belongs in source</td></tr>
 	<tr><td>themeCSS selection under Design &rarr; Theme</td><td><b>No</b></td><td>Manual step, lost on every reprovision &mdash; see <a href="theme-design.html#trap">the trap</a></td></tr>
-	<tr><td>Web content articles</td><td>Yes (seed)</td><td><code>journal-articles/*.xml</code> + <code>.json</code></td></tr>
+	<tr><td>Web content structures &amp; templates</td><td>Yes</td><td><code>ddm-structures/*.xml</code> (updated in place on reprovision) and <code>ddm-templates/<code>ddm-templates/&lt;name&gt;/ddm-template.json</code> + <code>.ftl</code>lt;name<code>ddm-templates/&lt;name&gt;/ddm-template.json</code> + <code>.ftl</code>gt;/ddm-template.json</code> + <code>ddm-template.ftl</code></td></tr>
+	<tr><td>Web content articles</td><td>Yes (seed)</td><td><code>journal-articles/*.json</code> + matching <code>.xml</code>, and <b>updated</b> (a new version) on every reprovision. See <a href="web-content.html">Web Content</a></td></tr>
 </table></div>
+
+<h2>"Web Content or Object?" &mdash; the tie-breakers</h2>
+<p>Most arguments on a project are about this one boundary. When the first table doesn't settle it, ask these in order. The first "yes" wins:</p>
+<div class="wrap"><table>
+	<tr><th>#</th><th>Question</th><th>Yes &rarr;</th></tr>
+	<tr><td>1</td><td>Is it submitted by site visitors or by another system rather than written by staff?</td><td><a href="objects.html">Object</a></td></tr>
+	<tr><td>2</td><td>Must editors preview it, schedule it, and roll back to last week's version?</td><td><a href="web-content.html">Web Content</a></td></tr>
+	<tr><td>3</td><td>Does anything need to count, sum, or filter it by typed values (dates, numbers, status)?</td><td><a href="objects.html">Object</a></td></tr>
+	<tr><td>4</td><td>Does one record point at another record that has its own life (employee &rarr; department)?</td><td><a href="objects.html#relationships">Object relationship</a></td></tr>
+	<tr><td>5</td><td>Is the main value prose with images inside it?</td><td><a href="web-content.html">Web Content</a></td></tr>
+</table></div>
+<div class="callout note">
+	<b>Both are fine to display</b>
+	<p>This decision rarely depends on the front end. <a href="collections.html">Collections</a>, <a href="templates.html#display">display page templates</a>, and <a href="fragments.html#mapping">fragment mapping</a> work for both articles and object entries. Decide based on how the data is <em>owned and changed</em>, not on how it will be shown.</p>
+</div>
 
 <h2>Cost ladder &mdash; reach for the cheapest thing that works</h2>
 <div class="ascii">cheapest ─────────────────────────────────────────────────────────────▶ most expensive

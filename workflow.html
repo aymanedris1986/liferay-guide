@@ -74,6 +74,8 @@
 	<tr><td><code>onAfterDelete</code></td><td>After delete</td><td>Cascade cleanup, audit</td></tr>
 	<tr><td><code>standalone</code></td><td>Only when invoked from the Actions menu or API</td><td>Manual approve, export</td></tr>
 </table></div>
+<p>The 2026.Q2 source defines a few narrower triggers too &mdash; <code>onAfterAttachmentDownload</code>, <code>onAfterLogin</code>, and <code>onAfterRootUpdate</code> (for the feature-flagged root-object hierarchies). Treat them as specialised and check the trigger dropdown for your object before relying on one. A standalone action is callable over REST, which is how an "Approve" button on a page runs it:</p>
+<pre><code>PUT /o/c/policyrequests/{id}/object-actions/{actionName}</code></pre>
 <p>A <code>conditionExpression</code> limits when it runs; empty means always:</p>
 <pre><code>requestStatus == "approved"
 amount &gt; 1000
@@ -85,9 +87,9 @@ amount &gt; 1000
 	<tr><td><code>notification</code></td><td>Sends a notification from a template</td><td>Needs <code>notificationTemplateId</code></td></tr>
 	<tr><td><code>add-object-entry</code></td><td>Creates an entry in another object</td><td><code>objectDefinitionId</code> + <code>predefinedValues</code></td></tr>
 	<tr><td><code>update-object-entry</code></td><td>Updates an entry</td><td>Same shape plus <code>objectEntryId</code></td></tr>
-	<tr><td><code>webhook</code></td><td>POSTs JSON to a URL</td><td>Signed <code>HMAC-SHA256</code>; digest in <code>X-Liferay-Webhook-Signature</code></td></tr>
+	<tr><td><code>webhook</code></td><td>POSTs the entry as JSON to a URL</td><td><b>Not signed</b>: the configured <code>secret</code> is sent verbatim in an <code>x-api-key</code> header. Use HTTPS and check that header on the receiver</td></tr>
 	<tr><td><code>groovy</code></td><td>Runs a Groovy script in the JVM</td><td><a href="#groovy">Usually disabled</a> &mdash; read before designing around it</td></tr>
-	<tr><td><code>objectAction</code> (CET)</td><td>Calls your <a href="client-extensions.html#objectaction">microservice</a></td><td>The recommended route for real logic</td></tr>
+	<tr><td><code>function#&lt;cetERC&gt;</code></td><td>Calls your <a href="client-extensions.html#objectaction">objectAction CET</a> microservice with an OAuth2 token</td><td>The recommended route for real logic. One executor key is registered per deployed CET, named after its ERC</td></tr>
 </table></div>
 <pre><code>{
 	"active": true,
@@ -99,9 +101,14 @@ amount &gt; 1000
 	"parameters": { "notificationTemplateId": "12345" }
 }</code></pre>
 
+<div class="callout warn">
+	<b>Actions run after the commit, and failures do not undo the save</b>
+	<p>Every <code>onAfter*</code> trigger fires once the entry is already stored. If the webhook times out or the CET throws, the entry stays; the failure shows up in the logs, not to the user. So never use an action as a gate &mdash; that is what <a href="objects.html">validations</a> are for &mdash; and make receivers idempotent, because a re-save delivers the same kind of event again.</p>
+</div>
+
 <div class="callout trap" id="groovy">
 	<b>Groovy actions are off by default &mdash; plan without them</b>
-	<p>Beyond being unavailable on SaaS, creating one is gated at runtime by <code>ScriptManagementConfiguration</code>, which is <b>off by default on current DXP</b>. The definition is rejected outright:</p>
+	<p>Beyond being unavailable on SaaS, creating one is gated at runtime by <code>ScriptManagementConfiguration</code>, which has been <b>off by default since 2024.Q3</b> (System Settings &rarr; Script Management). The definition is rejected outright:</p>
 	<pre><code>400 ObjectActionExecutorKeyException
 Groovy script based object actions are not allowed</code></pre>
 	<p>Turning it on is a portal-wide decision to permit arbitrary script execution &mdash; surface it, never enable it quietly. Probe with a throwaway action before designing a solution around Groovy, and prefer a scriptless alternative: an <a href="objects.html#aggregation">Aggregation field</a> replaces a hand-maintained counter outright.</p>
@@ -109,30 +116,81 @@ Groovy script based object actions are not allowed</code></pre>
 </div>
 
 <h2 id="kaleo">Kaleo workflows</h2>
-<p>Kaleo is the approval engine. A workflow definition is XML describing <b>states</b>, <b>tasks</b> (assigned to roles or users), and <b>transitions</b> between them. Attach a definition to a content type &mdash; <a href="web-content.html">Web Content</a>, an <a href="objects.html">Object</a>, Documents &mdash; and new items enter the flow instead of publishing immediately.</p>
-<div class="ascii">  submit ──▶ [ review task ]──approve──▶ [ manager task ]──approve──▶ APPROVED (visible)
-                   │                            │
-                 reject                       reject
-                   ▼                            ▼
-                 PENDING (back to author)    DENIED</div>
+<p>Kaleo is the approval engine. A workflow definition is XML describing <b>states</b>, <b>tasks</b> (assigned to roles or users), and <b>transitions</b> between them. Attach a definition to a content type &mdash; <a href="web-content.html">Web Content</a>, an <a href="objects.html">Object</a>, Documents &mdash; in <b>Process Builder &rarr; Configuration</b> (instance-wide) or in a site's workflow settings, and new items enter the flow instead of publishing immediately.</p>
+<p>Out of the box exactly one definition is installed: <b>Single Approver</b>. It is the best XML example you have, so here is its shape:</p>
+<div class="ascii">  created ──review──▶ [ review task ]──approve──▶ approved   (status → approved)
+  (initial)               │     ▲
+                       reject   resubmit
+                          ▼     │
+                     [ update task ]   assigned back to the author;
+                                       status → denied, then pending</div>
+<pre><code>&lt;task&gt;
+	&lt;name&gt;review&lt;/name&gt;
+	&lt;actions&gt;
+		&lt;notification&gt;
+			&lt;name&gt;Review Notification&lt;/name&gt;
+			&lt;template&gt;&lt;![CDATA[${userName} sent you a ${entryType} for review in the workflow.]]&gt;&lt;/template&gt;
+			&lt;template-language&gt;freemarker&lt;/template-language&gt;
+			&lt;notification-type&gt;email&lt;/notification-type&gt;
+			&lt;notification-type&gt;user-notification&lt;/notification-type&gt;
+			&lt;recipients receptionType="to"&gt;&lt;assignees /&gt;&lt;/recipients&gt;
+			&lt;execution-type&gt;onAssignment&lt;/execution-type&gt;
+		&lt;/notification&gt;
+	&lt;/actions&gt;
+	&lt;assignments&gt;
+		&lt;roles&gt;
+			&lt;role&gt;&lt;role-type&gt;site&lt;/role-type&gt;&lt;name&gt;Site Content Reviewer&lt;/name&gt;&lt;/role&gt;
+			&lt;role&gt;&lt;role-type&gt;regular&lt;/role-type&gt;&lt;name&gt;Portal Content Reviewer&lt;/name&gt;&lt;/role&gt;
+		&lt;/roles&gt;
+	&lt;/assignments&gt;
+	&lt;transitions&gt;
+		&lt;transition&gt;&lt;name&gt;approve&lt;/name&gt;&lt;target&gt;approved&lt;/target&gt;&lt;default&gt;true&lt;/default&gt;&lt;/transition&gt;
+		&lt;transition&gt;&lt;name&gt;reject&lt;/name&gt;&lt;target&gt;update&lt;/target&gt;&lt;default&gt;false&lt;/default&gt;&lt;/transition&gt;
+	&lt;/transitions&gt;
+&lt;/task&gt;</code></pre>
+<p>(Abridged: the real definition assigns review to a longer list of administrator, owner and reviewer roles across the regular, site, organization, asset library (<code>depot</code>) and account role types.) The <code>approved</code> state sets the entry's status with an action whose <code>&lt;status&gt;</code> is a <code>WorkflowConstants</code> integer: <code>0</code> approved, <code>1</code> pending, <code>2</code> draft, <code>4</code> denied.</p>
 <div class="wrap"><table>
 	<tr><th>Concept</th><th>Meaning</th></tr>
-	<tr><td>State</td><td>A resting point: <code>created</code>, <code>approved</code>, <code>denied</code></td></tr>
-	<tr><td>Task</td><td>Work assigned to a human; appears in their My Workflow Tasks</td></tr>
-	<tr><td>Transition</td><td>The edge between nodes</td></tr>
-	<tr><td>Action</td><td>Script or <a href="client-extensions.html#workflowaction">CET</a> executed at a node</td></tr>
-	<tr><td>Assignment</td><td>Role, user, scripted assignee, or resource creator</td></tr>
+	<tr><td>State</td><td>A resting point. Exactly one is <code>&lt;initial&gt;</code>; a state with no outgoing transition ends the flow</td></tr>
+	<tr><td>Task</td><td>Work assigned to a human; appears in their My Workflow Tasks. Tasks can carry <b>timers</b> (escalate or reassign after a delay)</td></tr>
+	<tr><td>Condition</td><td>A scripted branch: the script picks the transition to take</td></tr>
+	<tr><td>Fork / Join</td><td>Parallel review ("legal <em>and</em> finance"); a join waits for all branches, a join-xor for the first</td></tr>
+	<tr><td>Transition</td><td>The edge between nodes; its name is what a reviewer clicks and what the API sends</td></tr>
+	<tr><td>Action</td><td>Script or <a href="client-extensions.html#workflowaction">CET</a> executed <code>onEntry</code>, <code>onAssignment</code> or <code>onExit</code> of a node</td></tr>
+	<tr><td>Notification</td><td>A message sent at a node &mdash; <a href="#two-notifications">not the same thing</a> as a notification template</td></tr>
 </table></div>
+<h3>Assignments</h3>
+<div class="wrap"><table>
+	<tr><th>Assignment</th><th>XML</th><th>Who gets the task</th></tr>
+	<tr><td>Role</td><td><code>&lt;roles&gt;&lt;role&gt;&lt;role-type&gt;site&lt;/role-type&gt;&lt;name&gt;…</code></td><td>Everyone holding the role <em>in the item's context</em>: a site role means users with that role in the item's site. They see it under "Assigned to My Roles" and pick it up</td></tr>
+	<tr><td>Specific user</td><td><code>&lt;user&gt;&lt;email-address&gt;…</code> (or screen name / user id)</td><td>That person. Brittle across environments</td></tr>
+	<tr><td>Asset creator</td><td><code>&lt;user /&gt;</code> (empty)</td><td>The author &mdash; how Single Approver hands a rejected item back</td></tr>
+	<tr><td>Resource action</td><td><code>&lt;resource-actions&gt;&lt;resource-action&gt;UPDATE</code></td><td>Anyone with that permission on the item. Ties review rights to <a href="permissions.html">permissions</a> instead of a hard-coded role</td></tr>
+	<tr><td>Scripted</td><td><code>&lt;scripted-assignment&gt;</code></td><td>Whatever the script returns (a user or roles) &mdash; "the requester's manager"</td></tr>
+</table></div>
+<div class="callout trap">
+	<b>Scripts in workflow are off by default too</b>
+	<p>Condition nodes, scripted assignments and script actions are Groovy. As of <b>2024.Q3</b> scripting is disabled by default &mdash; the same switch that blocks <a href="#groovy">Groovy object actions</a> &mdash; and Groovy is not available on SaaS. So a definition that branches on a condition node needs that decision made first. Scriptless alternatives: separate definitions per case, resource-action assignments, or a <a href="client-extensions.html#workflowaction">workflowAction CET</a> that decides and transitions the task itself.</p>
+</div>
+
+<h3>Designer or XML</h3>
+<p>The drag-and-drop <b>Workflow Designer</b> in Process Builder is a <b>subscription (DXP)</b> feature; its Source view edits the same XML. On Liferay Portal CE you write the XML and upload it. Either way, keep the XML in source control: it is the definition, the designer is only an editor for it. Publishing a changed definition creates a new version, and items already in flight carry on under the version they started with.</p>
+
+<h3>Status and visibility</h3>
 <p>Entries under workflow carry a <code>status</code>; a <a href="collections.html">collection</a> only shows approved items, which is usually what you want and occasionally the reason your list is empty.</p>
 <p>A <a href="client-extensions.html#workflowaction">workflowAction CET</a> receives the task with a <code>transitionURL</code> and advances it:</p>
-<pre><code>PATCH {transitionURL}   {"transitionName": "approve"}</code></pre>
+<pre><code>POST {transitionURL}   {"transitionName": "approve"}
+Authorization: Bearer &lt;token issued to the CET's OAuth2 application&gt;</code></pre>
+<p>That is what Liferay's own Spring Boot sample (<code>WorkflowAction1RestController</code>) does. The transition name must be one leaving the current task.</p>
 
 <h2 id="notifications">Notification templates</h2>
-<p>The body of an email or in-app notification, with token interpolation:</p>
+<p>The body of an email or in-app notification, managed in the Notifications app and over REST, with <code>[%TERM%]</code> interpolation:</p>
 <pre><code>POST /o/notification/v1.0/notification-templates
 
-Hello [%USER_FIRST_NAME%],
-Your request [%OBJECT_FIELD_requestId%] is now [%OBJECT_FIELD_requestStatus%].</code></pre>
+Hello [%POLICYREQUEST_AUTHOR_FIRST_NAME%],
+Your request [%POLICYREQUEST_REQUESTID%] is now [%POLICYREQUEST_REQUESTSTATUS%].
+Handled by [%CURRENT_USER_FIRST_NAME%] on [%CURRENT_DATE%].</code></pre>
+<p>Object field terms are <code>[%&lt;OBJECTNAME&gt;_&lt;FIELDNAME&gt;%]</code>, both upper-cased (<code>PolicyRequest.requestStatus</code> &rarr; <code>[%POLICYREQUEST_REQUESTSTATUS%]</code>). The entry's author is <code>[%&lt;OBJECTNAME&gt;_AUTHOR_FIRST_NAME%]</code> and friends; the user who triggered the action is <code>[%CURRENT_USER_…%]</code>. The template editor lists every valid term for the chosen object &mdash; copy from there rather than guessing, because a misspelt term is not an error.</p>
 <div class="wrap"><table>
 	<tr><th>Channel</th><th>How</th></tr>
 	<tr><td>Email</td><td>Built in &mdash; template type Email</td></tr>
@@ -140,6 +198,18 @@ Your request [%OBJECT_FIELD_requestId%] is now [%OBJECT_FIELD_requestStatus%].</
 	<tr><td>SMS, push, Teams, Slack</td><td><a href="client-extensions.html#notificationtype">notificationType CET</a></td></tr>
 </table></div>
 <p>Create the template first, then reference its ID from a <code>notification</code> object action. Templates live in an initializer under <code>notification-templates/</code>, and the action that uses one under <code>object-actions/</code>.</p>
+
+<h3 id="two-notifications">Workflow notifications are a different thing</h3>
+<p>Two unrelated systems send messages, and they are easy to confuse:</p>
+<div class="wrap"><table>
+	<tr><th></th><th>Kaleo workflow notification</th><th>Notification template</th></tr>
+	<tr><td>Lives in</td><td>The workflow definition XML, inside a node's <code>&lt;actions&gt;</code></td><td>The Notifications app / <code>/o/notification</code></td></tr>
+	<tr><td>Fired by</td><td>Entering, being assigned, or leaving a workflow node</td><td>A <code>notification</code> <a href="#actions">object action</a></td></tr>
+	<tr><td>Syntax</td><td>FreeMarker, Velocity or plain text: <code>${userName}</code>, <code>${entryType}</code>, <code>${taskComments}</code></td><td><code>[%TERM%]</code> tokens</td></tr>
+	<tr><td>Recipients</td><td><code>&lt;assignees/&gt;</code>, the creator (<code>&lt;user/&gt;</code>), roles, scripted recipients</td><td>Configured on the template</td></tr>
+	<tr><td>Channels</td><td><code>email</code>, <code>user-notification</code></td><td>Email, user notification, or a <a href="client-extensions.html#notificationtype">notificationType CET</a></td></tr>
+</table></div>
+<p>Rule of thumb: messages about <em>the review</em> ("you have a task", "your submission was rejected") belong in the workflow XML. Messages about <em>the data</em> ("your request is now approved") belong in an object action plus a template, because they should fire however the data changed.</p>
 
 <h2>How it connects</h2>
 <ul class="rel">
@@ -158,7 +228,7 @@ Your request [%OBJECT_FIELD_requestId%] is now [%OBJECT_FIELD_requestStatus%].</
 	<li><a href="objects.html">Object</a> <code>PolicyException</code> with a <code>state</code> picklist field defaulting to <code>submitted</code>.</li>
 	<li>A <a href="forms.html">Form Container</a> on a page creates entries.</li>
 	<li>A Kaleo workflow attached to the object routes new entries to the HR role.</li>
-	<li>An <code>onAfterUpdate</code> object action with condition <code>exceptionStatus == "approved"</code> fires a <code>notification</code> action using an email template.</li>
+	<li>An <code>onAfterUpdate</code> object action with condition <code>exceptionStatus == "approved"</code> fires a <code>notification</code> action using an email template. (Keep that picklist in step with the workflow: the workflow's own <code>status</code> and your state field are separate, so either the reviewer sets the picklist or a <a href="client-extensions.html#workflowaction">workflowAction CET</a> updates it on approval.)</li>
 	<li>A dynamic <a href="collections.html">collection</a> filtered to approved entries renders the intranet list; Guest needs a company-scope VIEW grant for it to be non-empty.</li>
 </ol>
 <p>Nothing in that list requires custom code. Reach for a <a href="client-extensions.html#objectaction">CET</a> only at step 4, and only if the notification has to leave Liferay.</p>
@@ -171,6 +241,10 @@ Your request [%OBJECT_FIELD_requestId%] is now [%OBJECT_FIELD_requestStatus%].</
 <div class="callout warn">
 	<b>Workflow silently hides content</b>
 	<p>Attaching a workflow to a type that already had published items is fine, but every <em>new</em> item now sits in <code>PENDING</code> until someone approves it. Listings render short and nobody gets an error.</p>
+</div>
+<div class="callout warn">
+	<b>Nobody holds the assigned role</b>
+	<p>A task assigned to a site role that has no members in that site is a task nobody sees. The item sits pending forever. After deploying a definition, check that every assigned role has at least one real user in the relevant scope.</p>
 </div>
 		<footer class="pagefoot">
 			Part of the <a href="index.html">Liferay Component Guide</a>.

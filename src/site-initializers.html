@@ -2,54 +2,112 @@
 <!--subtitle: A whole site as version-controlled source. The single most important architectural decision on a Liferay project — and the one with the most silent failure modes.-->
 
 <h2>In one sentence</h2>
-<p>A <b>site initializer</b> is a <a href="client-extensions.html">client extension</a> of type <code>siteInitializer</code> whose directory tree describes an entire site &mdash; <a href="pages.html">pages</a>, <a href="fragments.html">fragments</a>, <a href="objects.html">objects</a>, roles, <a href="permissions.html">permissions</a>, content, <a href="theme-design.html#stylebook">style books</a> &mdash; and creates it on deploy.</p>
+<p>A <b>site initializer</b> is a <a href="client-extensions.html">client extension</a> of type <code>siteInitializer</code> whose directory tree describes an entire site &mdash; <a href="pages.html">pages</a>, <a href="fragments.html">fragments</a>, <a href="objects.html">objects</a>, roles, <a href="permissions.html">permissions</a>, content, <a href="theme-design.html#stylebook">style books</a> &mdash; and creates or updates it on deploy.</p>
 <div class="callout good">
 	<b>The principle</b>
 	<p>The initializer tree is the <b>single source of truth</b>. Build the site by triggering the initializer; iterate by editing the source and reapplying. Never hand-edit the live site as the authoritative copy.</p>
 </div>
 
+<h2>Two flavours, one engine</h2>
+<div class="wrap"><table>
+	<tr><th></th><th><code>siteInitializer</code> CET (use this)</th><th>Bundle-based site initializer (older)</th></tr>
+	<tr><td>Packaging</td><td>A <code>site-initializer/</code> folder in a CET project, zipped by the workspace plugin</td><td>An OSGi module with a <code>Liferay-Site-Initializer-Name</code> header and the same tree under <code>src/main/resources/site-initializer/</code></td></tr>
+	<tr><td>Triggered by</td><td>Deploying the zip: Liferay creates <em>or updates</em> the site whose ERC is <code>siteExternalReferenceCode</code></td><td>An admin choosing it as a template in <b>Add Site</b></td></tr>
+	<tr><td>Runs on SaaS</td><td>Yes</td><td>No (it is a module)</td></tr>
+	<tr><td>Log key</td><td><code>Initializing &lt;siteName&gt; for group &lt;id&gt;</code></td><td><code>Initializing &lt;bundle symbolic name&gt; for group &lt;id&gt;</code></td></tr>
+	<tr><td>Examples</td><td>Your project</td><td>Liferay's own: <code>com.liferay.site.initializer.welcome</code>, masterclass, the commerce accelerators</td></tr>
+</table></div>
+<p>Both are executed by the same class, <code>BundleSiteInitializer</code>, so the folder layout, handlers, tokens and log lines below apply to both. Liferay's own bundled initializers are the best reference for file formats you cannot find documented &mdash; they ship in <code>osgi/portal/com.liferay.site.initializer.*.jar</code>.</p>
+
+<h2>How deploying one actually works</h2>
+<div class="ascii">zip lands in osgi/client-extensions/
+   │  file-install watcher sees a new or CHANGED zip
+   ▼
+SiteInitializerClientExtension
+   │  builds a Site DTO (name, ERC, membershipType, parentSiteKey) + the site-initializer.zip
+   ▼
+headless-admin-site:  PUT /sites/{siteExternalReferenceCode}/site-initializer
+   │  "adds or updates" the site
+   ▼
+BundleSiteInitializer.initialize(groupId)
+   │  Initializing … → Invoking &lt;handler&gt; took N ms … → Initialized … in N ms</div>
+<p>Two consequences worth internalising:</p>
+<ul>
+	<li><b>The deploy is an API call you can make yourself.</b> <code>PUT /o/headless-admin-site/v1.0/sites/{siteERC}/site-initializer</code> with a multipart <code>file</code> applies a zip without touching the file-install folder, and <code>GET</code> on the same path <b>exports</b> an existing site as a site-initializer zip &mdash; a fast way to bootstrap a tree from a site someone built by hand.</li>
+	<li><b>A re-run is an update, not a rebuild.</b> Handlers are named <code>addOrUpdate…</code> for a reason: they upsert by key or ERC into the existing site. That is why some changes apply on reapply and others (below) need the site deleted first.</li>
+</ul>
+<pre><code>badael-site-init:
+    membershipType: private         # open (default) | restricted | private
+    name: Badael Site Initializer
+    oAuthApplicationHeadlessServer: badael-site-oauth
+    siteExternalReferenceCode: badael      # required — the site's identity forever
+    siteName: Badael Site                  # required — also the log key
+    type: siteInitializer</code></pre>
+<div class="callout warn">
+	<b>Pick the ERC once</b>
+	<p><code>siteExternalReferenceCode</code> is how every future deploy finds the site. Change it and the next deploy creates a <em>second</em> site instead of updating the first.</p>
+</div>
+
 <h2>The tree</h2>
 <div class="ascii">client-extensions/&lt;name&gt;/
 ├── client-extension.yaml
-└── site-initializer/
-    ├── documents/group/&lt;folder&gt;/…            media
-    ├── fragments/group/&lt;collection-key&gt;/
+└── site-initializer/                        ← required; the plugin fails without it
+    ├── documents/group/&lt;folder&gt;/…            media (documents/company for instance-wide)
+    ├── ddm-structures/                      web content structures
+    ├── ddm-templates/                       web content templates (ddm-template.json + .ftl)
+    ├── fragments/group/&lt;collection-key&gt;/     (fragments/company for global sets)
     │   ├── collection.json
     │   └── fragments/&lt;fragment-name&gt;/…       ← "fragments" nesting level is required
-    ├── journal-articles/&lt;name&gt;.{xml,json}    web content
+    ├── journal-articles/&lt;name&gt;.{json,xml}    web content: metadata JSON + content XML
     ├── layout-page-templates/
     │   ├── display-page-templates/&lt;name&gt;/
     │   └── master-pages/&lt;name&gt;/              master-page.json + page-definition.json
     ├── layout-set/public/metadata.json       theme + chrome settings
+    ├── layout-utility-page-entries/          404, error, terms pages
     ├── layouts/&lt;NN-page&gt;/                    NN prefix controls creation order
     │   ├── page.json
     │   ├── page-definition.json
     │   └── &lt;NN-child-page&gt;/…                 nested pages
     ├── list-type-definitions/&lt;name&gt;.json     picklists
     ├── object-definitions/&lt;NN-name&gt;.json
-    ├── object-relationships/, object-fields/, object-actions/, object-entries/
+    ├── object-folders/, object-relationships/, object-fields/, object-actions/, object-entries/
+    ├── notification-templates/
     ├── resource-permissions.json             role grants
     ├── roles.json
+    ├── sap-entries.json                      service access policies
+    ├── segments-entries.json, segments-experiences/
     ├── site-navigation-menus.json
+    ├── site-settings.json, site-configuration.json
     ├── style-books/&lt;name&gt;/style-book.json
+    ├── taxonomy-vocabularies/group/           vocabularies + categories
+    ├── user-accounts.json, user-groups.json, user-roles.json, organizations.json
+    ├── workflow-definitions/
     └── thumbnail.png</div>
+<p>The full set of paths the handler looks for is larger still (accounts, blogs, knowledge base, depot entries, expando columns, language overrides, asset lists). If a directory is not listed in the handler, it is not an error to have it &mdash; it is silently ignored, which is exactly the problem.</p>
+<p>Each file holds a single <b>raw DTO</b> &mdash; usually the same JSON shape the matching <a href="headless-apis.html">headless API</a> accepts &mdash; with no <code>configuration</code> wrapper and no <code>items</code> array.</p>
 
-<h3>Handler order</h3>
-<p>Handlers run in a fixed order, so a file may reference anything an earlier handler produced:</p>
-<div class="ascii">list-type-definitions → object-folders → object-definitions → object-relationships
-  → object-fields → publishObjectDefinitions → object-actions → object-entries</div>
+<h3>Handler order is a dependency graph, not a list</h3>
+<p>Handlers do not run in folder order. The initializer resolves which handlers depend on which (it even detects circular dependencies) and runs them accordingly. A real run on 2026.Q2 looked like this:</p>
+<div class="ascii">addSiteSettings → addOrUpdateListTypeDefinitions → addOrUpdateUserGroups → addOrUpdateDataDefinitions
+→ addOrUpdateObjectFolders → addOrUpdateDDMStructures → … → addStyleBookEntries → addOrUpdateRoles
+→ addOrUpdateLayouts           ← pages are created as EMPTY shells early
+→ … addOrUpdateDocuments → addFragmentEntries → addObjectDefinitions → addOrUpdateObjectRelationships
+→ addOrUpdateObjectFields → publishObjectDefinitions → addOrUpdateDDMTemplates → addOrUpdateObjectActions
+→ addOrUpdateJournalArticles → addOrUpdateObjectEntries → addLayoutPageTemplates
+→ addOrUpdateLayoutsContent    ← page composition is applied LATE, once fragments, content, masters exist
+→ addLayoutUtilityPageEntries → addSegmentsExperiences → addOrUpdateResourcePermissions</div>
+<p>The pattern to rely on: <b>things are created first and filled in later</b>. Pages exist before their content so navigation menus and links can point at them; objects are created, related, given fields, and only then published; permissions come last so they can reference everything. For objects the chain is fixed: definitions &rarr; relationships &rarr; fields &rarr; publish &rarr; actions &rarr; entries.</p>
 <p>Because publishing happens <em>after</em> creation, <b>omit <code>status</code> from an object definition file</b> &mdash; the initializer publishes it for you.</p>
-<p>Each file holds a single <b>raw DTO</b> &mdash; no <code>configuration</code> wrapper, no <code>items</code> array.</p>
 
 <h2 id="reprovision">Applying a change</h2>
 <div class="wrap"><table>
 	<tr><th>Change</th><th>How to apply it</th><th>Reprovision?</th></tr>
 	<tr><td>Theme / design</td><td>Deploy the <a href="theme-design.html#themecss">themeCSS CET</a></td><td>No</td></tr>
-	<tr><td>Object definition or data</td><td><code>object-admin</code> API, or edit the tree and reprovision</td><td>No</td></tr>
+	<tr><td>Object definition or data</td><td><code>object-admin</code> API, or edit the tree and reapply</td><td>No</td></tr>
 	<tr><td>Fragment content, or a new fragment</td><td>Edit the source tree, then reprovision</td><td><b>Yes</b></td></tr>
 	<tr><td>New page, page composition, fragment placement</td><td>Delete the site, recreate from the initializer</td><td><b>Yes</b></td></tr>
 </table></div>
-<p>The initializer runs <b>once, at site creation</b>. Redeploying does not update an existing site. Re-triggering upserts pages but does <em>not</em> retrofit composition changes onto pages that already exist.</p>
+<p>Deploying a <b>changed</b> zip re-runs the initializer against the existing site (the <code>PUT</code> above). That upserts pages, objects, roles and similar keyed records, but in this project it did <em>not</em> reliably apply composition changes to pages that already exist, and fragment edits do not reach placed instances (the 2026.Q2 source does replace a content page&rsquo;s composition on re-run, which can also wipe editor changes; see <a href="pages.html">Pages</a>). For those, delete the site and let the next deploy create it fresh &mdash; the reprovision cycle below.</p>
 
 <h3>The reprovision cycle</h3>
 <pre><code>#!/usr/bin/env bash
@@ -82,7 +140,7 @@ awk -v n=$((before + 1)) '/Initializing '"${SITE_NAME}"'/{c++} c&gt;=n' "${LOG}"
 <div class="callout trap">
 	<b>Two things go wrong when you do this by hand</b>
 	<p><b>1.</b> <code>before</code> must be read <em>before</em> the delete. Read it late and you compare the new run against itself; the loop spins out on a build that actually succeeded.</p>
-	<p><b>2.</b> The <code>Initializing</code> line is <em>not</em> the end of the run. Handlers keep logging after it, so sampling immediately shows a partial list and a missing handler reads as a failure.</p>
+	<p><b>2.</b> The <code>Initializing</code> line is <em>not</em> the end of the run. Handlers keep logging after it, so sampling immediately shows a partial list and a missing handler reads as a failure. The run is over at <code>Initialized &lt;name&gt; for group &lt;id&gt; in N ms</code> &mdash; waiting for that line is more robust than a fixed <code>sleep</code>.</p>
 </div>
 <div class="callout trap">
 	<b><code>blade gw deploy</code> with no source change rewrites nothing</b>
@@ -98,13 +156,16 @@ awk -v n=$((before + 1)) '/Initializing '"${SITE_NAME}"'/{c++} c&gt;=n' "${LOG}"
 <div class="wrap"><table>
 	<tr><th>Token</th><th>Resolves to</th></tr>
 	<tr><td><code>[$GROUP_ID$]</code>, <code>[$GROUP_KEY$]</code>, <code>[$GROUP_FRIENDLY_URL$]</code></td><td>Current site</td></tr>
-	<tr><td><code>[$COMPANY_ID$]</code>, <code>[$PORTAL_URL$]</code></td><td>Instance context</td></tr>
-	<tr><td><code>[$OBJECT_DEFINITION_ID:X$]</code> / <code>[$OBJECT_DEFINITION_CLASS_NAME:X$]</code></td><td><a href="objects.html">Object</a> ID / class name</td></tr>
+	<tr><td><code>[$COMPANY_ID$]</code>, <code>[$PORTAL_URL$]</code>, <code>[$PORTAL_PROPERTY:name$]</code></td><td>Instance context</td></tr>
+	<tr><td><code>[$OBJECT_DEFINITION_ID:X$]</code> / <code>[$OBJECT_DEFINITION_CLASS_NAME:X$]</code> / <code>[$OBJECT_DEFINITION_PORTLET_ID:X$]</code></td><td><a href="objects.html">Object</a> ID / class name / its admin widget</td></tr>
 	<tr><td><code>[$LIST_TYPE_DEFINITION_ID:X$]</code></td><td>Picklist ID</td></tr>
 	<tr><td><code>[$ROLE_ID:X$]</code>, <code>[$LAYOUT_ID:/url$]</code></td><td>Role / page</td></tr>
-	<tr><td><code>[$DOCUMENT_JSON:/path$]</code>, <code>[$DOCUMENT_URL:name$]</code></td><td><a href="documents-media.html">Document</a> reference</td></tr>
-	<tr><td><code>[$JOURNAL_ARTICLE_ID:erc$]</code>, <code>[$DDM_STRUCTURE_ID:X$]</code></td><td><a href="web-content.html">Content</a> IDs</td></tr>
+	<tr><td><code>[$DOCUMENT_JSON:/path$]</code>, <code>[$DOCUMENT_URL:name$]</code>, <code>[$DOCUMENT_FILE_ENTRY_ID:…$]</code></td><td><a href="documents-media.html">Document</a> reference</td></tr>
+	<tr><td><code>[$JOURNAL_ARTICLE_ID:erc$]</code>, <code>[$DDM_STRUCTURE_ID:X$]</code>, <code>[$DDM_TEMPLATE_ID:X$]</code></td><td><a href="web-content.html">Content</a> IDs</td></tr>
+	<tr><td><code>[$TAXONOMY_VOCABULARY_ID:X$]</code>, <code>[$TAXONOMY_CATEGORY_ID:X$]</code></td><td><a href="taxonomy.html">Taxonomy</a> IDs</td></tr>
+	<tr><td><code>[$ASSET_LIST_ENTRY_ID:X$]</code>, <code>[$SEGMENTS_ENTRY_ID:X$]</code>, <code>[$CLIENT_EXTENSION_ENTRY_ERC:X$]</code></td><td><a href="collections.html">Collections</a>, <a href="personalization.html">segments</a>, CETs</td></tr>
 </table></div>
+<p>Replacement is plain string substitution over the file, so a token whose key has a typo is not a parse error you can count on. The symptom tends to be a record pointing at nothing (a menu item with no page, a permission on no role) or a failed conversion further down. Check the resulting site, not just the log.</p>
 <div class="callout note">
 	<b>Object tokens are the exception &mdash; they see the whole company</b>
 	<p>Most tokens are registered by the handler that creates the entity, so they resolve only for entities in <em>this tree</em>. Object definitions are exempt: the handler runs a company-wide pass <em>before</em> reading any file, registering tokens for <b>every published object definition in the company</b>, whoever created it.</p>
@@ -113,7 +174,7 @@ awk -v n=$((before + 1)) '/Initializing '"${SITE_NAME}"'/{c++} c&gt;=n' "${LOG}"
 </div>
 
 <h2>Verifying what actually happened</h2>
-<pre><code>grep --extended-regexp 'Initializing|Invoking (addOrUpdateListTypeDefinitions|addObjectDefinitions|addOrUpdateObjectRelationships|addOrUpdateLayouts|addOrUpdateLayoutsContent|addLayoutPageTemplates|addStyleBookEntries|addFragmentEntries|addOrUpdateResourcePermissions)' \
+<pre><code>grep --extended-regexp 'Initializ|Invoking (addOrUpdateListTypeDefinitions|addObjectDefinitions|addOrUpdateObjectRelationships|addOrUpdateLayouts|addOrUpdateLayoutsContent|addLayoutPageTemplates|addStyleBookEntries|addFragmentEntries|addOrUpdateResourcePermissions)' \
 	bundles/tomcat/logs/catalina.out | tail -20</code></pre>
 <p>The signal is the <b>jump between runs</b>, not the absolute number:</p>
 <pre><code>Invoking addStyleBookEntries took 1 ms      &lt;- before: directory absent
@@ -125,10 +186,11 @@ Invoking addLayoutPageTemplates took 134 ms &lt;- after: master page imported</c
 	<tr><td>Fragments log as <code>addFragmentEntries</code></td><td>No <code>addOrUpdate</code> prefix. Grepping for <code>addOrUpdateFragmentEntries</code> matches nothing, which reads exactly like the directory was never found.</td></tr>
 	<tr><td>Navigation menus log <b>nothing</b></td><td>That handler runs inside <code>addOrUpdateLayoutsContent</code>. Its absence proves nothing &mdash; count menu items over REST instead.</td></tr>
 	<tr><td>A flat timing is a hint, not a verdict</td><td>Single-file handlers can apply correctly and still round to 1 ms. Assert the outcome.</td></tr>
+	<tr><td>Log lines are not in folder order</td><td>See the dependency graph above. Look for a handler by name, not by position.</td></tr>
 	<tr><td>Timestamps are UTC</td><td>Your shell probably is not. A line that looks hours ahead may be the current run.</td></tr>
 </table></div>
-<p>A failed initialization <b>rolls the site back</b>, so "the site does not exist" and "the initializer threw" are the same symptom:</p>
-<pre><code>grep --extended-regexp 'InitializationException|MustNotBeReserved|Unable to transform' \
+<p>A failed initialization <b>rolls the site back</b>, so "the site does not exist" and "the initializer threw" are the same symptom. The failure is logged by <code>BundleSiteInitializer</code> at ERROR, sometimes with a message as unhelpful as <code>null</code> &mdash; read the stack trace underneath, and note which handler was the last one logged before it:</p>
+<pre><code>grep --extended-regexp 'InitializationException|MustNotBeReserved|Unable to transform|ERROR .*BundleSiteInitializer' \
 	bundles/tomcat/logs/catalina.out | head</code></pre>
 
 <h2>What the tree does and does not rebuild</h2>
@@ -140,10 +202,15 @@ Invoking addLayoutPageTemplates took 134 ms &lt;- after: master page imported</c
 	<tr><td>Seeded web content and documents</td><td>Editor-authored content created after provisioning</td></tr>
 </table></div>
 <p>Say plainly which half of the data layer your tree rebuilds. A mixed layout &mdash; objects managed live, their logic and permissions authored in the tree &mdash; is workable and common; it just needs to be stated rather than assumed.</p>
+<div class="callout warn">
+	<b>Deleting the site does not delete company-scoped things</b>
+	<p>Object definitions, picklists, roles, users and company-scope documents live at the instance level. The reprovision cycle deletes the <em>site</em>; the next run finds those records and updates them by key. That is usually what you want, but do not assume that something you <em>removed</em> from the tree is removed from the instance &mdash; an upsert adds and updates; check before relying on deletion.</p>
+</div>
 
 <h2>How it connects</h2>
 <ul class="rel">
 	<li><a href="client-extensions.html">Client extensions &mdash; the packaging</a></li>
+	<li><a href="headless-apis.html">Headless APIs &mdash; the PUT that applies it, and the DTO shapes the files use</a></li>
 	<li><a href="pages.html">Pages &mdash; <code>layouts/</code></a></li>
 	<li><a href="fragments.html">Fragments &mdash; <code>fragments/group/</code></a></li>
 	<li><a href="objects.html">Objects &mdash; <code>object-definitions/</code></a></li>
@@ -164,4 +231,8 @@ Invoking addLayoutPageTemplates took 134 ms &lt;- after: master page imported</c
 <div class="callout warn">
 	<b>The <code>fragments</code> nesting level is not optional</b>
 	<p><code>fragments/group/&lt;collection&gt;/fragments/&lt;name&gt;/</code>. Drop the second <code>fragments</code> and the handler finds nothing, logs 1 ms, and the site provisions with no fragments &mdash; so every page that references one renders blank.</p>
+</div>
+<div class="callout warn">
+	<b>No theme, CSS or JS in the initializer project</b>
+	<p>A <code>siteInitializer</code> is a <em>batch</em>-classified CET, so it cannot share a project with <code>themeCSS</code> or <code>globalJS</code> (<a href="client-extensions.html#grouping">grouping rules</a>). Put them in a sibling frontend project and deploy both.</p>
 </div>

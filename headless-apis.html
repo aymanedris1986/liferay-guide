@@ -56,59 +56,120 @@
 		<h1>Headless APIs</h1>
 		<p class="lede">Every component in this guide has a REST surface. Here are the modules, their base URIs, the ID convention each one uses, and the feature flags that make endpoints appear to not exist.</p>
 
+<h2>What "headless" means here</h2>
+<p>Liferay's REST APIs are generated from OpenAPI specs by its REST Builder, on a shared framework (Vulcan). That matters because it is why every module behaves the same way: the same <code>page</code>/<code>pageSize</code>, the same <code>filter</code>/<code>sort</code>/<code>search</code>, the same <code>fields</code>/<code>nestedFields</code>, a <code>/batch</code> variant of most write operations, and a GraphQL mirror of most of it. Learn the conventions once and they apply to every module below.</p>
+<div class="ascii">/o/&lt;module&gt;/v1.0/&lt;resource&gt;      REST, one JAX-RS application per module
+/o/c/&lt;objectPlural&gt;              REST for each published Object (one app per object)
+/o/graphql                        GraphQL over the same resources
+/o/api                            API Explorer: browse and try every module, logged in as you
+/o/&lt;module&gt;/v1.0/openapi.json      the spec (also .yaml)</div>
+
 <h2>The modules</h2>
-<p>All paths resolve relative to <code>http://localhost:${PORT}</code>. Basic auth (<code>test@liferay.com:test</code>) works for local exploration and bypasses scope checks entirely, which is why a call that works in curl can still fail from a <a href="client-extensions.html">CET</a>.</p>
+<p>All paths resolve relative to <code>http://localhost:${PORT}</code>. Basic auth (<code>test@liferay.com:test</code>) works for local exploration and evaluates no OAuth scopes, which is why a call that works in curl can still fail from a <a href="client-extensions.html">CET</a>.</p>
 <div class="wrap"><table>
-	<tr><th>Module</th><th>Base URI</th><th>Covers</th><th>OAuth scope</th></tr>
-	<tr><td>headless-admin-site</td><td><code>/o/headless-admin-site/v1.0</code></td><td><a href="pages.html">Pages</a>, navigation menus, display page templates, master pages, sites</td><td><code>Liferay.Headless.Admin.Site.everything</code></td></tr>
-	<tr><td>headless-admin-content</td><td><code>/o/headless-admin-content/v1.0</code></td><td><a href="web-content.html">Web content</a>, <a href="content-structures.html">structures</a>, style books, fragment collections</td><td><code>Liferay.Headless.Admin.Content.everything</code></td></tr>
-	<tr><td>headless-delivery</td><td><code>/o/headless-delivery/v1.0</code></td><td>Delivery-side content, blogs, <a href="documents-media.html">documents</a>, page contents</td><td><code>Liferay.Headless.Delivery.everything</code></td></tr>
-	<tr><td>object-admin</td><td><code>/o/object-admin/v1.0</code></td><td><a href="objects.html">Object definitions</a>, fields, relationships, actions, validations</td><td><code>Liferay.Object.Admin.REST.everything</code></td></tr>
-	<tr><td>object entries</td><td><code>/o/c/&lt;pluralLabel&gt;</code></td><td>Entries of a published object</td><td><code>Liferay.Headless.Object.everything</code></td></tr>
-	<tr><td>headless-admin-fragment</td><td><code>/o/headless-admin-fragment/v1.0</code></td><td><a href="fragments.html">Fragment</a> sets and fragments</td><td><code>Liferay.Headless.Admin.Fragment.everything</code></td></tr>
-	<tr><td>headless-admin-list-type</td><td><code>/o/headless-admin-list-type/v1.0</code></td><td><a href="objects.html#picklists">Picklists</a></td><td><code>Liferay.Headless.Admin.List.Type.everything</code></td></tr>
-	<tr><td>headless-admin-user</td><td><code>/o/headless-admin-user/v1.0</code></td><td>Users, accounts, <a href="permissions.html">roles</a>, organizations</td><td><code>Liferay.Headless.Admin.User.everything</code></td></tr>
-	<tr><td>headless-admin-workflow</td><td><code>/o/headless-admin-workflow/v1.0</code></td><td><a href="workflow.html">Workflow</a> definitions, instances, tasks</td><td><code>Liferay.Headless.Admin.Workflow.everything</code></td></tr>
-	<tr><td>batch-engine</td><td><code>/o/headless-batch-engine/v1.0</code></td><td>Bulk import/export</td><td><code>Liferay.Headless.Batch.Engine.everything</code></td></tr>
+	<tr><th>Module</th><th>Base URI</th><th>Site key</th><th>Covers</th><th>OAuth scope</th></tr>
+	<tr><td>headless-admin-site</td><td><code>/o/headless-admin-site/v1.0</code></td><td><b>ERC</b></td><td>Sites, <a href="pages.html">pages</a>, navigation menus, display page templates, master pages, page templates, utility pages, style books</td><td><code>Liferay.Headless.Admin.Site.everything</code></td></tr>
+	<tr><td>headless-admin-content</td><td><code>/o/headless-admin-content/v1.0</code></td><td>numeric</td><td><a href="web-content.html">Web content</a> admin views: drafts, versions, display page templates by key</td><td><code>Liferay.Headless.Admin.Content.everything</code></td></tr>
+	<tr><td>headless-delivery</td><td><code>/o/headless-delivery/v1.0</code></td><td>numeric</td><td>Structured content, <a href="content-structures.html">content structures</a> (read), blogs, <a href="documents-media.html">documents</a>, KB, message boards, comments</td><td><code>Liferay.Headless.Delivery.everything</code></td></tr>
+	<tr><td>object-admin</td><td><code>/o/object-admin/v1.0</code></td><td>&mdash;</td><td><a href="objects.html">Object definitions</a>, fields, relationships, actions, validations, layouts, views</td><td><code>Liferay.Object.Admin.REST.everything</code></td></tr>
+	<tr><td>object entries</td><td><code>/o/c/&lt;pluralLabel&gt;</code></td><td>&mdash;</td><td>Entries of a published object</td><td>Per object &mdash; see the trap below</td></tr>
+	<tr><td>headless-admin-fragment</td><td><code>/o/headless-admin-fragment/v1.0</code></td><td><b>ERC</b></td><td><a href="fragments.html">Fragment</a> sets and fragments</td><td><code>Liferay.Headless.Admin.Fragment.everything</code></td></tr>
+	<tr><td>headless-admin-list-type</td><td><code>/o/headless-admin-list-type/v1.0</code></td><td>&mdash;</td><td><a href="objects.html#picklists">Picklists</a></td><td><code>Liferay.Headless.Admin.List.Type.everything</code></td></tr>
+	<tr><td>headless-admin-user</td><td><code>/o/headless-admin-user/v1.0</code></td><td>numeric</td><td>Users, accounts, <a href="permissions.html">roles</a>, organizations, user groups</td><td><code>Liferay.Headless.Admin.User.everything</code></td></tr>
+	<tr><td>headless-admin-taxonomy</td><td><code>/o/headless-admin-taxonomy/v1.0</code></td><td>numeric</td><td><a href="taxonomy.html">Vocabularies, categories, tags</a></td><td><code>Liferay.Headless.Admin.Taxonomy.everything</code></td></tr>
+	<tr><td>headless-admin-workflow</td><td><code>/o/headless-admin-workflow/v1.0</code></td><td>&mdash;</td><td><a href="workflow.html">Workflow</a> definitions, instances, tasks</td><td><code>Liferay.Headless.Admin.Workflow.everything</code></td></tr>
+	<tr><td>batch-engine</td><td><code>/o/headless-batch-engine/v1.0</code></td><td>&mdash;</td><td>Bulk import/export tasks</td><td><code>Liferay.Headless.Batch.Engine.everything</code></td></tr>
 </table></div>
+<p>The scope name is always the module's JAX-RS application name plus <code>.everything</code>, <code>.everything.read</code> or <code>.everything.write</code>. Prefer the read variant for anything that only reads.</p>
 
 <div class="callout trap">
 	<b>ERC vs numeric ID &mdash; this costs everyone an hour</b>
-	<p><code>headless-admin-site</code> keys subresources by <b>external reference code</b>: <code>/sites/{siteExternalReferenceCode}/site-pages</code>. A numeric site ID returns <b>404</b>, which reads like "the endpoint does not exist" and sends you hunting a feature flag.</p>
-	<p><code>headless-admin-content</code> and <code>headless-delivery</code>, in the same product, use the <b>numeric</b> <code>{siteId}</code>.</p>
+	<p><code>headless-admin-site</code> and <code>headless-admin-fragment</code> key everything by <b>external reference code</b>: <code>/sites/{siteExternalReferenceCode}/site-pages</code>. A numeric site ID returns <b>404</b>, which reads like "the endpoint does not exist" and sends you hunting a feature flag.</p>
+	<p><code>headless-admin-content</code>, <code>headless-delivery</code> and <code>headless-admin-taxonomy</code>, in the same product, use the <b>numeric</b> <code>{siteId}</code>. Most of those also offer <code>by-external-reference-code/{erc}</code> sub-paths for individual items, so you can still write scripts that never hard-code a numeric ID.</p>
 </div>
 
 <h2>Common paths</h2>
-<pre><code># Pages — ERC in the path
-GET  /o/headless-admin-site/v1.0/sites/{siteERC}/site-pages
-POST /o/headless-admin-site/v1.0/sites/{siteERC}/site-pages
-POST /o/headless-admin-site/v1.0/sites/{siteERC}/navigation-menus
-POST /o/headless-admin-site/v1.0/sites/{siteERC}/display-page-templates
+<pre><code># Sites and pages — ERC in the path
+GET    /o/headless-admin-site/v1.0/sites/{siteERC}
+DELETE /o/headless-admin-site/v1.0/sites/{siteERC}
+GET    /o/headless-admin-site/v1.0/sites/{siteERC}/site-pages
+POST   /o/headless-admin-site/v1.0/sites/{siteERC}/site-pages
+POST   /o/headless-admin-site/v1.0/sites/{siteERC}/navigation-menus
+POST   /o/headless-admin-site/v1.0/sites/{siteERC}/display-page-templates
+GET    /o/headless-admin-site/v1.0/sites/{siteERC}/style-books
 
 # Web content — numeric siteId
-POST /o/headless-admin-content/v1.0/sites/{siteId}/structured-contents
-POST /o/headless-admin-content/v1.0/sites/{siteId}/content-structures
+POST /o/headless-delivery/v1.0/sites/{siteId}/structured-contents
+GET  /o/headless-delivery/v1.0/sites/{siteId}/structured-contents/by-external-reference-code/{erc}
+GET  /o/headless-delivery/v1.0/sites/{siteId}/content-structures
+GET  /o/headless-admin-content/v1.0/sites/{siteId}/structured-contents   # admin view: latest versions, not just approved
 
 # Objects — definitions then entries
 POST /o/object-admin/v1.0/object-definitions
 POST /o/object-admin/v1.0/object-definitions/{id}/object-fields
 POST /o/object-admin/v1.0/object-definitions/{id}/object-relationships
 POST /o/object-admin/v1.0/object-definitions/{id}/publish
+GET  /o/object-admin/v1.0/object-definitions/by-external-reference-code/{erc}
 GET  /o/c/policies?filter=…&amp;sort=…&amp;page=1&amp;pageSize=20
+PUT  /o/c/policies/by-external-reference-code/{erc}        # create-or-replace by ERC
 
-# Fragments — fragments are keyed by a generated ERC, not the fragment key
+# Fragments — keyed by a generated ERC, not the fragment key
 GET  /o/headless-admin-fragment/v1.0/sites/{siteERC}/fragment-sets
 GET  /o/headless-admin-fragment/v1.0/sites/{siteERC}/fragment-sets/{setERC}/fragments</code></pre>
+<div class="callout note">
+	<b>PUT by ERC is the idempotent write</b>
+	<p>Wherever a resource offers <code>PUT …/by-external-reference-code/{erc}</code>, it creates the record if the ERC is new and replaces it if it exists. Scripts and integrations built on that pattern can be re-run safely; scripts built on <code>POST</code> create duplicates or fail with 409 the second time.</p>
+</div>
 
 <h2>Common parameters</h2>
 <div class="wrap"><table>
 	<tr><th>Parameter</th><th>Values</th></tr>
-	<tr><td><code>page</code> / <code>pageSize</code></td><td>1-based; default 20, max 200</td></tr>
-	<tr><td><code>filter</code></td><td>OData: <code>title eq 'Hello'</code>, <code>dateCreated gt 2026-01-01</code></td></tr>
-	<tr><td><code>sort</code></td><td><code>fieldName:asc</code> / <code>fieldName:desc</code></td></tr>
-	<tr><td><code>fields</code> / <code>restrictFields</code></td><td>Projection, to shrink the response</td></tr>
-	<tr><td><code>nestedFields</code></td><td>Expand related records inline &mdash; the relationship name</td></tr>
+	<tr><td><code>page</code> / <code>pageSize</code></td><td>1-based; default page size 20. The maximum is the instance's <b>page size limit</b> (default <b>500</b>, Instance Settings &rarr; Headless API). A larger value is <em>silently clamped</em>, not rejected.</td></tr>
+	<tr><td><code>filter</code></td><td>OData subset: <code>title eq 'Hello'</code>, <code>dateCreated gt 2026-01-01T00:00:00Z</code>, <code>contains(title,'leave')</code>, <code>startswith(name,'A')</code>, <code>status in (0, 2)</code>, combined with <code>and</code>/<code>or</code>/<code>not</code>; collection fields support <code>any</code>/<code>all</code> lambdas. Only fields the resource declares as filterable work.</td></tr>
+	<tr><td><code>sort</code></td><td><code>fieldName:asc</code> / <code>fieldName:desc</code>, comma-separated for several</td></tr>
+	<tr><td><code>search</code></td><td>Keyword search through the search index, not a database <code>LIKE</code></td></tr>
+	<tr><td><code>fields</code></td><td>Whitelist: return only these (dot notation for nested, e.g. <code>fields=id,title,creator.name</code>)</td></tr>
+	<tr><td><code>restrictFields</code></td><td>Blacklist: return everything <em>except</em> these (e.g. <code>restrictFields=actions,contentFields</code>)</td></tr>
+	<tr><td><code>nestedFields</code></td><td>Expand related records inline &mdash; for objects, the relationship name; <code>nestedFieldsDepth</code> controls how deep</td></tr>
+	<tr><td><code>Accept-Language</code> header</td><td>Which locale localized fields come back in (e.g. <code>ar-SA</code>)</td></tr>
+	<tr><td><code>X-Accept-All-Languages: true</code> header</td><td>Also return <code>*_i18n</code> maps with every translation</td></tr>
 </table></div>
+<pre><code># Leave requests longer than 3 days, newest first, lean payload,
+# with the related employee (relationship named "employee") inlined
+curl -s -u test@liferay.com:test -H 'Accept-Language: en-US' \
+  'http://localhost:8080/o/c/leaverequests?filter=days%20gt%203&amp;sort=dateCreated:desc&amp;fields=id,startDate,days,employee&amp;nestedFields=employee&amp;pageSize=50'</code></pre>
+<p>URL-encode the filter (spaces as <code>%20</code>); an unencoded quote or space is the usual cause of a 400 that "works in the API Explorer".</p>
+<div class="callout warn">
+	<b>The actions block is your permission oracle</b>
+	<p>Every item (and the page itself) carries an <code>actions</code> map of the operations the <em>current</em> caller may perform, with their URLs. A UI should render buttons from it instead of re-implementing permission logic. It is also the bulk of many payloads, which is why <code>restrictFields=actions</code> is a cheap win for read-only integrations.</p>
+</div>
+
+<h2>Batch: bulk writes and exports</h2>
+<p>For anything beyond a few hundred records, do not loop over <code>POST</code>. Two options:</p>
+<div class="wrap"><table>
+	<tr><th>Option</th><th>Path</th><th>Use when</th></tr>
+	<tr><td>Resource batch endpoint</td><td><code>POST /o/c/policies/batch</code>, <code>POST /o/headless-delivery/v1.0/sites/{siteId}/structured-contents/batch</code></td><td>You have a JSON array of one resource type</td></tr>
+	<tr><td>Batch engine task</td><td><code>POST /o/headless-batch-engine/v1.0/import-task/{className}</code>; export via <code>export-task/{className}/{contentType}</code></td><td>Files (JSON, JSONL, CSV), exports, or explicit strategies</td></tr>
+</table></div>
+<p>Both are <b>asynchronous</b>: the response is an import task with an ID and a status (<code>STARTED</code>, <code>COMPLETED</code>, <code>FAILED</code>). Poll <code>GET /o/headless-batch-engine/v1.0/import-task/{id}</code> and fetch <code>…/failed-items/report</code> for per-row errors. Strategy query parameters decide what re-runs do: <code>createStrategy=UPSERT|INSERT</code>, <code>updateStrategy=UPDATE|PARTIAL_UPDATE</code>, <code>importStrategy=ON_ERROR_FAIL|ON_ERROR_CONTINUE</code>. The same engine is behind the <a href="client-extensions.html"><code>batch</code> CET</a>.</p>
+<div class="callout trap">
+	<b>A 200 from a batch call means "accepted", not "imported"</b>
+	<p>A batch where every row failed still answers the initial request with success. Always read the task's final status and failed-items report.</p>
+</div>
+
+<h2>Authentication, in practice</h2>
+<div class="wrap"><table>
+	<tr><th>Caller</th><th>Use</th><th>Why</th></tr>
+	<tr><td>You, in curl, locally</td><td>Basic auth</td><td>Fast; but no scopes are evaluated</td></tr>
+	<tr><td>A server integration or job</td><td>OAuth2 client credentials (<code>oAuthApplicationHeadlessServer</code>, or an app created in OAuth 2 Administration)</td><td>Service account, least-privilege scopes</td></tr>
+	<tr><td>A microservice CET Liferay calls</td><td>The JWT Liferay sends (<code>oAuthApplicationUserAgent</code>)</td><td>Acts as the triggering user</td></tr>
+	<tr><td>Browser JS on a Liferay page (fragment, custom element)</td><td>The session cookie + <code>x-csrf-token: Liferay.authToken</code></td><td>Runs as the visitor, with the visitor's permissions</td></tr>
+	<tr><td>Anonymous public calls</td><td>A <a href="permissions.html#sap">Service Access Policy</a> + Guest permissions</td><td>Both gates must open</td></tr>
+</table></div>
+<pre><code># client-credentials token, then call
+TOKEN=$(curl -s -X POST http://localhost:8080/o/oauth2/token \
+  -d grant_type=client_credentials -d client_id="$ID" -d client_secret="$SECRET" | jq -r .access_token)
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/o/headless-admin-user/v1.0/my-user-account</code></pre>
 
 <h2>Error codes, and what they usually actually mean</h2>
 <div class="wrap"><table>
@@ -116,31 +177,34 @@ GET  /o/headless-admin-fragment/v1.0/sites/{siteERC}/fragment-sets/{setERC}/frag
 	<tr><td>400</td><td>Validation error</td><td>Read the <code>title</code> in the problem detail &mdash; it names the field</td></tr>
 	<tr><td>401</td><td>Not authenticated</td><td>The OAuth registration, not the scopes</td></tr>
 	<tr><td>403</td><td>Forbidden</td><td>Scope too narrow, or a missing <a href="permissions.html#sap">Service Access Policy</a> for anonymous calls</td></tr>
-	<tr><td>404</td><td>Not found</td><td>A <b>feature flag is off</b>, or you passed a numeric ID where an ERC was required</td></tr>
+	<tr><td>404</td><td>Not found</td><td>A <b>feature flag is off</b>, you passed a numeric ID where an ERC was required, or (observed on this project) a VIEW permission denial on an object entry</td></tr>
 	<tr><td>409</td><td>Conflict</td><td>Duplicate name or ERC</td></tr>
 	<tr><td>500</td><td>Server error</td><td>Check <code>bundles/logs/liferay.&lt;date&gt;.log</code></td></tr>
 	<tr><td><b>200 with an empty list</b></td><td>&mdash;</td><td>A <a href="permissions.html">permission</a> gap. This is the dangerous one.</td></tr>
 </table></div>
 
 <h2>Feature flags</h2>
-<p>Several APIs are gated. A flag that is off makes its endpoints return 404, which is indistinguishable from a wrong path.</p>
+<p>Several APIs are gated. A flag that is off makes its endpoints return 404, which is indistinguishable from a wrong path. Values below are the defaults in the 2026.Q2.11 <code>portal.properties</code>.</p>
 <div class="wrap"><table>
-	<tr><th>Flag</th><th>Default</th><th>Unlocks</th><th>Depends on</th></tr>
-	<tr><td><code>LPD-35443</code></td><td>off</td><td>Public layout (page) REST API</td><td>&mdash;</td></tr>
-	<tr><td><code>LPD-38869</code></td><td>on</td><td>Private layout REST access</td><td>&mdash;</td></tr>
-	<tr><td><code>LPD-39244</code></td><td>off</td><td>Fragment / page composition REST API</td><td>&mdash;</td></tr>
-	<tr><td><code>LPD-74328</code></td><td>off</td><td>Page element / page specification create and update</td><td><code>LPD-35443</code></td></tr>
-	<tr><td><code>LPD-17564</code></td><td>off</td><td>Object collaborators (per-entry permissions)</td><td>&mdash;</td></tr>
-	<tr><td><code>LPD-52006</code></td><td>off</td><td>Object entry folders</td><td><code>LPD-17564</code></td></tr>
-	<tr><td><code>LPD-63311</code></td><td>off</td><td>MCP server at <code>/o/mcp/sse</code></td><td>&mdash;</td></tr>
+	<tr><th>Flag</th><th>Default</th><th>Type</th><th>Title in Feature Flags UI</th></tr>
+	<tr><td><code>LPD-35443</code></td><td>off</td><td>beta</td><td><b>Page Management API</b> &mdash; create and update pages, and their elements, by ERC instead of ID</td></tr>
+	<tr><td><code>LPD-38869</code></td><td>on</td><td>deprecation</td><td><b>Private Pages</b> &mdash; private pages are deprecated in favour of content pages; turning this off removes them</td></tr>
+	<tr><td><code>LPD-39244</code></td><td>off</td><td>&mdash;</td><td>Not a documented flag; observed on this project to gate fragment / page-composition REST</td></tr>
+	<tr><td><code>LPD-74328</code></td><td>off</td><td>&mdash;</td><td>Not a documented flag; observed on this project to gate page element / page specification writes</td></tr>
+	<tr><td><code>LPD-17564</code></td><td>off</td><td>release</td><td><b>CMS</b> &mdash; the new headless CMS. Depends on <code>LPD-34594</code> (Root Object Definitions)</td></tr>
+	<tr><td><code>LPD-63311</code></td><td>off</td><td>beta</td><td><b>Liferay MCP Server</b> &mdash; exposes headless APIs to LLM clients over the Model Context Protocol, served under <code>/o/mcp</code></td></tr>
 </table></div>
 <pre><code># in the active environment's portal-ext.properties
-feature.flag.LPD-35443=true</code></pre>
-<p>Most flags need a Tomcat bounce. Verify at <b>Control Panel &rarr; Instance Settings &rarr; Feature Flags</b> &mdash; the running portal is the only source of truth, since defaults change between quarterly releases.</p>
+feature.flag.LPD-35443=true
+
+# or as an environment variable (Docker / SaaS)
+LIFERAY_FEATURE_PERIOD_FLAG_PERIOD__UPPERCASEL__UPPERCASEP__UPPERCASED__MINUS__NUMBER3__NUMBER5__NUMBER4__NUMBER4__NUMBER3_=true</code></pre>
+<p>Most flags need a Tomcat bounce. Flags with a declared dependency (<code>feature.flag.X.dependencies</code> in <code>portal.properties</code>) do nothing unless the dependency is also on. Verify at <b>Control Panel &rarr; Instance Settings &rarr; Feature Flags</b> &mdash; the running portal is the only source of truth, since defaults change between quarterly releases. Flags without a UI title (dev flags) do not appear there at all.</p>
 
 <h2>Discovering endpoints</h2>
-<pre><code>GET /o/&lt;module&gt;/v1.0/openapi.json</code></pre>
-<p>The spec gives you exact paths and payload shapes. It does <b>not</b> tell you the base URI conventions, the feature-flag gates, or the OAuth scopes &mdash; those come from the table above.</p>
+<pre><code>GET /o/api                                  # API Explorer (sign in first)
+GET /o/&lt;module&gt;/v1.0/openapi.json           # or openapi.yaml</code></pre>
+<p>The spec gives you exact paths, parameters and payload shapes. It does <b>not</b> tell you the ERC-vs-ID convention, the feature-flag gates, or the OAuth scope names &mdash; those come from the tables above. Object entries have their own spec per object: <code>/o/c/&lt;plural&gt;/openapi.json</code>.</p>
 
 <h2>How it connects</h2>
 <ul class="rel">
@@ -148,18 +212,26 @@ feature.flag.LPD-35443=true</code></pre>
 	<li><a href="pages.html">Pages &mdash; creating layouts programmatically</a></li>
 	<li><a href="client-extensions.html">CETs &mdash; what calls these, and with which token</a></li>
 	<li><a href="permissions.html#sap">Service Access Policies &mdash; the gate before permissions</a></li>
-	<li><a href="site-initializers.html">Site initializers &mdash; the declarative alternative</a></li>
+	<li><a href="site-initializers.html">Site initializers &mdash; the declarative alternative, itself an API call</a></li>
 	<li><a href="fragments.html">Fragments &mdash; browser-side calls run as the visitor</a></li>
 </ul>
 
 <h2>Traps</h2>
 <div class="callout trap">
+	<b>Object entry scopes are per object</b>
+	<p>Each published object registers its own JAX-RS application, so <code>/o/c/policies</code> has its own scope, named after the object. Pick it from the scope list in <b>OAuth 2 Administration</b> and copy the exact string. <code>Liferay.Headless.Object.everything</code> exists but belongs to <code>/o/headless-object</code> (object entry folders), and does <em>not</em> authorise <code>/o/c/…</code>.</p>
+</div>
+<div class="callout trap">
 	<b>Editing a fragment over the API does not change any page using it</b>
-	<p>Liferay copies fragment code into each page's fragment instance. A <code>PUT</code> updates the library entry and leaves every existing placement untouched. <a href="site-initializers.html#reprovision">Reprovision</a> to apply fragment changes.</p>
+	<p>Liferay copies fragment code into each page's fragment instance. A <code>PUT</code> updates the library entry and leaves every existing placement untouched until someone propagates it (the fragment's Usages view in the UI). <a href="site-initializers.html#reprovision">Reprovision</a> to apply fragment changes from source.</p>
 </div>
 <div class="callout warn">
 	<b>Basic auth hides scope problems</b>
 	<p>Your curl as <code>test@liferay.com</code> has full admin rights and evaluates no scopes. The same call from a CET with a narrow token returns 403. Test the CET path before declaring it works.</p>
+</div>
+<div class="callout warn">
+	<b>One denied row can break an object listing</b>
+	<p>Observed on this project: when entry-level permissions make one row of <code>GET /o/c/&lt;plural&gt;</code> unviewable, the per-row VIEW check can fail the whole page instead of dropping the row. If lists 404 or error for some users only, suspect per-entry permissions before the query.</p>
 </div>
 <div class="callout warn">
 	<b>One section fragment breaks the fragment listing</b>

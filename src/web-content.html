@@ -4,6 +4,11 @@
 <h2>In one sentence</h2>
 <p>A <b>Web Content article</b> (internally a <em>Journal Article</em>) is one record of editorial content: a title plus values for the fields its <a href="content-structures.html">Content Structure</a> defines, rendered by a <a href="web-content-templates.html">Web Content Template</a> and placed on a <a href="pages.html">page</a>.</p>
 
+<div class="callout note">
+	<b>Maintenance mode since 2026.Q1</b>
+	<p>Liferay moved classic Web Content (along with Documents &amp; Media and Asset Libraries) into <b>maintenance mode</b> in 2026.Q1. It is fully supported and keeps getting fixes, but new features go to the object-based Liferay CMS, which is off by default on 2026.Q2 (see <a href="index.html#two-cms">Two CMSes</a>). Everything on this page still applies to Badael.</p>
+</div>
+
 <h2>What it actually is</h2>
 <p>Three things are always involved, and confusing them is the #1 source of "why is my content blank":</p>
 <div class="ascii">  Content Structure  ──── defines what fields exist ────▶   "Title, Subtitle, Image, Body, Author"
@@ -20,9 +25,10 @@
 <h3>Basic vs structured</h3>
 <div class="wrap"><table>
 	<tr><th>Kind</th><th>What it is</th><th>Use when</th></tr>
-	<tr><td><b>Basic Web Content</b></td><td>One rich-text body, no structure chosen</td><td>Free-form prose: an "About us" blurb, a legal notice. Editors get a WYSIWYG and nothing to fill in wrong.</td></tr>
-	<tr><td><b>Structured Web Content</b></td><td>Article bound to a <a href="content-structures.html">Content Structure</a></td><td>Anything repeated with consistent parts: news, press releases, staff profiles, product cards. Enables reliable <a href="collections.html">collections</a> and <a href="templates.html#display">display pages</a>.</td></tr>
+	<tr><td><b>Basic Web Content</b></td><td>An article using the built-in <em>Basic Web Content</em> structure (key <code>BASIC-WEB-CONTENT</code>, in the Global site), which has one localizable rich-text field called <code>content</code></td><td>Free-form prose: an "About us" blurb, a legal notice. Editors get a WYSIWYG and nothing to fill in wrong.</td></tr>
+	<tr><td><b>Structured Web Content</b></td><td>Article bound to a <a href="content-structures.html">Content Structure</a> you designed</td><td>Anything repeated with consistent parts: news, press releases, staff profiles, product cards. Enables reliable <a href="collections.html">collections</a> and <a href="templates.html#display">display pages</a>.</td></tr>
 </table></div>
+<p>So there is no such thing as an article "without a structure". Every article has exactly one, chosen at creation and <b>fixed afterwards</b>. You can't move an existing article to another structure from the UI. "Basic" just means "the generic one-field structure".</p>
 <div class="callout note">
 	<b>Rule of thumb</b>
 	<p>If you will ever want to list these items, filter them, or give each one its own URL, it must be <b>structured</b>. Basic web content is a dead end for anything but a one-off block of prose.</p>
@@ -37,7 +43,20 @@
 	<li><b>Asset behaviour</b> — <a href="taxonomy.html">categories and tags</a>, related assets, ratings, comments, and search indexing come along automatically.</li>
 	<li><b>Folders</b> — for organisation and per-folder permissions/workflow.</li>
 </ul>
-<p>An <a href="objects.html">Object</a> gives you none of the first four. That is the real dividing line between the two.</p>
+<p>Compare with an <a href="objects.html">Object</a>. Objects can also be localized (per field, 2023.Q3+), put through workflow, and tagged/categorized. What they don't have on 2026.Q2 classic is the <em>editorial</em> kit: compare/restore versions, display/expiration/review dates, preview-before-publish, and the side-by-side translation UI with XLIFF export. (Object entry versioning exists only with the new CMS feature flag. See <a href="index.html#two-cms">the two-CMS note</a>.) That kit is the real dividing line.</p>
+
+<h3>Identity: the IDs an article carries</h3>
+<p>An article has more than one identifier, and code that uses the wrong one breaks quietly:</p>
+<div class="wrap"><table>
+	<tr><th>ID</th><th>What it is</th><th>Use it for</th></tr>
+	<tr><td><code>articleId</code></td><td>Human-readable key, unique per site (e.g. <code>LEADERSHIP_PROFILE_8</code>). The same across versions</td><td>Web Content Display config, initializer tokens</td></tr>
+	<tr><td><code>resourcePrimKey</code></td><td>The article's asset/resource ID, stable across versions. It is what the headless API returns as a structured content's <code>id</code></td><td>REST calls, asset links, permissions</td></tr>
+	<tr><td><code>id</code> (row ID)</td><td>One database row per <b>version</b>. It changes every time the article is saved</td><td>Nothing. Never store it</td></tr>
+	<tr><td><code>externalReferenceCode</code></td><td>Your own stable key, portable across environments</td><td>Sync scripts and anything that must match DEV to PROD</td></tr>
+</table></div>
+
+<h3>Versions and statuses</h3>
+<p>Each save creates a version row with a status: <b>Draft</b>, <b>Pending</b> (in <a href="workflow.html">workflow</a>), <b>Approved</b>, <b>Scheduled</b> (approved, display date in the future), <b>Expired</b>. Visitors only ever see the latest <em>approved</em> version whose display date has passed. So "I edited it and nothing changed" usually means the edit is sitting as a draft or in a workflow task, and the site is still showing the previous approved version. That is working as designed.</p>
 
 <h2>When to use it</h2>
 <div class="wrap"><table>
@@ -58,7 +77,21 @@
 	<li><a href="taxonomy.html">Categories &mdash; what collections filter on</a></li>
 	<li><a href="workflow.html">Workflow &mdash; approval before publish</a></li>
 	<li><a href="headless-apis.html">Headless APIs &mdash; create and read articles</a></li>
+	<li><a href="permissions.html">Permissions &mdash; per-article and per-folder VIEW/UPDATE</a></li>
 </ul>
+
+<h3>Reading articles over REST</h3>
+<p>In the Headless Delivery API an article is a <b>structured content</b> and a structure is a <b>content structure</b>. The useful endpoints:</p>
+<pre><code># all articles in a site (title, dates, taxonomy, contentFields[])
+GET /o/headless-delivery/v1.0/sites/{siteId}/structured-contents
+
+# articles of ONE structure, filterable by a field value
+GET /o/headless-delivery/v1.0/content-structures/{structureId}/structured-contents
+    ?filter=contentFields/department eq 'Finance'
+
+# one article, rendered through a given template (returns HTML)
+GET /o/headless-delivery/v1.0/structured-contents/{id}/rendered-content/{templateId}</code></pre>
+<p>Filtering on <code>contentFields/&lt;fieldReference&gt;</code> only works on the <em>per-structure</em> endpoint, and only for fields indexed as <b>keyword</b>. The site-wide endpoint rejects that syntax, so use a search blueprint there. (Source: Liferay KB, "How to filter web content by structure field with headless APIs".)</p>
 
 <h3>The four ways an article reaches a visitor</h3>
 <div class="wrap"><table>
@@ -70,7 +103,7 @@
 </table></div>
 
 <h2>In source control</h2>
-<p>A <a href="site-initializers.html">site initializer</a> carries articles as a pair of files under <code>journal-articles/</code>: a <code>.json</code> naming the structure and folder, and an <code>.xml</code> holding the field values.</p>
+<p>A <a href="site-initializers.html">site initializer</a> carries articles as a pair of files under <code>journal-articles/</code>: a <code>.json</code> with metadata and an <code>.xml</code> with the same base name holding the field values. This example is taken from Liferay's own <em>teaser-showcase</em> initializer:</p>
 <pre><code>journal-articles/leadership/leadership_profile_8.json
 {
 	"ddmStructureKey": "Leadership Profile",
@@ -82,24 +115,43 @@
 	&lt;dynamic-element field-reference="name" index-type="keyword" name="name" type="text"&gt;
 		&lt;dynamic-content language-id="en_US"&gt;&lt;![CDATA[Nigel Cook]]&gt;&lt;/dynamic-content&gt;
 	&lt;/dynamic-element&gt;
-	&lt;dynamic-element field-reference="image" name="image" type="image"&gt;
+	&lt;dynamic-element field-reference="image" index-type="text" name="image" type="image"&gt;
 		&lt;dynamic-content language-id="en_US"&gt;
 			&lt;![CDATA[[$DOCUMENT_JSON:/site-initializer/documents/group/Leadership/leader.png$]]]&gt;
 		&lt;/dynamic-content&gt;
 	&lt;/dynamic-element&gt;
 &lt;/root&gt;</code></pre>
-<p>Note the <code>[$DOCUMENT_JSON:…$]</code> token: media references resolve at provisioning time, so the XML never hardcodes an ID. Same idea as every other <a href="site-initializers.html#tokens">initializer token</a>.</p>
+<p>Note the <code>[$DOCUMENT_JSON:…$]</code> token: media references resolve at provisioning time, so the XML never hardcodes an ID. Same idea as every other <a href="site-initializers.html#tokens">initializer token</a>. The key is the document's path inside the initializer bundle.</p>
+<p>What the importer (<code>BundleSiteInitializer</code>) actually reads from the <code>.json</code> tells you a few things you can't see from the sample:</p>
+<div class="wrap"><table>
+	<tr><th>Key</th><th>Effect</th></tr>
+	<tr><td><code>name</code></td><td>The title, set for the <b>site default locale only</b>. Translated titles can't be seeded this way</td></tr>
+	<tr><td><code>ddmStructureKey</code></td><td>Structure key. For initializer structures this is the <code>&lt;name&gt;</code> in <code>ddm-structures/*.xml</code>. It is looked up in the site and its ancestors, so Global structures such as <code>BASIC-WEB-CONTENT</code> resolve too</td></tr>
+	<tr><td><code>ddmTemplateKey</code></td><td>Optional default template</td></tr>
+	<tr><td><code>articleId</code></td><td>Optional. Defaults to the file name, upper-cased (<code>leadership_profile_8.json</code> &rarr; <code>LEADERSHIP_PROFILE_8</code>)</td></tr>
+	<tr><td><code>assetCategoryERCs</code>, <code>assetTagNames</code></td><td>Arrays of <a href="taxonomy.html">categories</a> (by ERC) and tags</td></tr>
+	<tr><td><code>folder</code></td><td><b>Ignored.</b> The folder comes from the <em>directory</em>: <code>journal-articles/leadership/</code> becomes a folder called <code>leadership</code>, unless a sibling <code>leadership.metadata.json</code> supplies <code>name</code>, <code>description</code>, <code>externalReferenceCode</code>, <code>viewableBy</code></td></tr>
+</table></div>
+<p>Each imported article also registers a <code>[$JOURNAL_ARTICLE_ID:&lt;ARTICLEID&gt;$]</code> token, which resolves to its <code>resourcePrimKey</code>, for later files to reference.</p>
+<div class="callout warn">
+	<b>Reprovisioning overwrites editor changes</b>
+	<p>If an article with that <code>articleId</code> already exists, the initializer calls <code>updateArticle</code> with the XML from source. Every reprovision therefore creates a <em>new version</em> containing the seeded values and silently replaces whatever an editor typed on the live site. Keep seeds for content that source control owns (demo, legal boilerplate). Content that editors own should not be in <code>journal-articles/</code> after the first provisioning.</p>
+</div>
 
 <h2>Traps</h2>
 <div class="callout trap">
 	<b>Changing a structure after articles exist</b>
-	<p>Removing or renaming a field on a live <a href="content-structures.html">structure</a> orphans the data already stored under that field reference in every article's XML. Add fields freely; removing them is a migration, not an edit.</p>
+	<p>Removing a field or changing its <em>field reference</em> on a live <a href="content-structures.html">structure</a> cuts every existing article off from the value stored under the old reference. Templates render empty and the editor form no longer shows it. Add fields freely. Removing or re-keying them is a migration, not an edit.</p>
 </div>
 <div class="callout trap">
 	<b>Guest cannot read what you can</b>
-	<p>A logged-out visitor needs both a <a href="permissions.html#sap">Service Access Policy</a> (for Headless reads) and a VIEW grant. Your article looks fine to you and returns nothing to them. Verify with an unauthenticated <code>curl</code>, never with your own session.</p>
+	<p>A logged-out visitor needs VIEW on the article (and its folder) for it to render on a page. For headless reads, Guest also needs a <a href="permissions.html#sap">Service Access Policy</a> that allows the endpoint. Your article looks fine to you and returns nothing to them. Verify with an unauthenticated <code>curl</code> or a private window, never with your own session.</p>
 </div>
 <div class="callout warn">
 	<b>Basic content in a structured slot</b>
-	<p>A <a href="collections.html">dynamic collection</a> filtered to a structure will silently skip basic articles &mdash; they have no structure, so they do not match. The list just comes back shorter than expected.</p>
+	<p>A <a href="collections.html">dynamic collection</a> filtered to your <em>News Article</em> structure silently skips articles an editor created as Basic Web Content. They belong to the <code>BASIC-WEB-CONTENT</code> structure, so they don't match. The list just comes back shorter than expected, and because an article's structure can't be changed afterwards, the fix is to recreate them.</p>
+</div>
+<div class="callout trap">
+	<b>Expired and scheduled articles vanish without an error</b>
+	<p>An expiration date in the past, or a display date in the future, removes the article from collections, search, and Web Content Display for visitors. Admins still see it in the admin list, marked with a status label. When "one item is missing" from a list, check the dates before debugging the collection.</p>
 </div>

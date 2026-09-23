@@ -2,7 +2,7 @@
 <!--subtitle: The field definition behind a Web Content article. It decides what editors are asked for, and what templates, collections and display pages can reference.-->
 
 <h2>In one sentence</h2>
-<p>A <b>Content Structure</b> (older name: <em>DDM Structure</em>) is a form definition. It lists the fields a <a href="web-content.html">Web Content article</a> of that kind has, their types, whether they repeat, and whether they are required.</p>
+<p>A <b>Content Structure</b> (in the UI: <em>Web Content &rarr; Structures</em>. In code and APIs it is a <code>DDMStructure</code>, or a <em>content structure</em> in Headless Delivery) is a form definition. It lists the fields a <a href="web-content.html">Web Content article</a> of that kind has, their types, whether they repeat, and whether they are required.</p>
 
 <h2>What it actually is</h2>
 <p>Think of it as a database table definition that a non-developer can build in a drag-and-drop form builder. Create a structure called <em>News Article</em> with fields <code>headline</code>, <code>summary</code>, <code>heroImage</code>, <code>body</code>, <code>publishDate</code>, and every news article now has exactly those slots.</p>
@@ -13,22 +13,37 @@
 	<li><b>They make content filterable.</b> A <a href="collections.html">dynamic collection</a> can select "all Web Content of structure <em>News Article</em>", and a <a href="templates.html#display">display page template</a> binds to one structure.</li>
 </ol>
 
+<div class="callout note">
+	<b>Not the new CMS's "Content Structures"</b>
+	<p>This page covers the classic DDM structure used by Web Content. The new object-based CMS (feature-flagged on 2026.Q2, GA in 2026.Q3) also calls its schemas "content structures", but they are Object definitions with different settings (ERC, Mandatory, picklists, Select Related Content). If a learn.liferay.com page mentions <em>Spaces</em>, it is describing the other one. See <a href="index.html#two-cms">the two-CMS note</a>.</p>
+</div>
+
+<h3>Where it lives</h3>
+<p><b>Site Menu &rarr; Content &amp; Data &rarr; Web Content &rarr; Structures</b> tab. Structures are scoped: a structure in the <b>Global</b> site is available to every site, while a site structure is only available to that site (and its child sites). Asset Libraries have their own structures too. The Actions menu on a structure is worth knowing:</p>
+<ul>
+	<li><b>Edit Default Values</b> pre-fills fields for every new article of that structure.</li>
+	<li><b>Manage Templates</b> jumps to the <a href="web-content-templates.html">templates</a> bound to it.</li>
+	<li><b>Export as JSON</b> / <b>Import and Override</b> moves a definition between environments. From 2025.Q1 the export carries an external reference code, so imports match up instead of duplicating. Export and import any <em>fieldsets</em> first, or the import fails on missing references.</li>
+	<li><b>Permissions</b> control who can <em>use</em> the structure to create articles, not just who can edit it. This is how you stop editors picking the wrong structure.</li>
+</ul>
+
 <h3>Field types you will actually use</h3>
 <div class="wrap"><table>
-	<tr><th>Type</th><th>Stores</th><th>Notes</th></tr>
-	<tr><td>Text</td><td>Single-line string</td><td>Index as <em>keyword</em> when you want to filter/sort on it</td></tr>
-	<tr><td>Text Box</td><td>Multi-line plain text</td><td>Summaries, alt text</td></tr>
-	<tr><td>Rich Text (HTML)</td><td>WYSIWYG markup</td><td>The article body; avoid for anything you need to style precisely</td></tr>
-	<tr><td>Image</td><td>Reference to a <a href="documents-media.html">Document</a></td><td>Stored as a reference, not a copy &mdash; replacing the document updates every article</td></tr>
-	<tr><td>Document &amp; Media</td><td>File reference</td><td>PDFs, attachments</td></tr>
-	<tr><td>Link to Page</td><td>Layout reference</td><td>Survives page renames; a raw text URL does not</td></tr>
-	<tr><td>Date / Number / Decimal / Boolean</td><td>Typed scalars</td><td>Typed values sort and filter correctly; a date in a Text field does not</td></tr>
-	<tr><td>Select / Radio / Checkbox</td><td>Enumerated choice</td><td>Options are defined in the structure itself</td></tr>
-	<tr><td>Geolocation, Color, Rich Content</td><td>Specialised</td><td>Rarely load-bearing</td></tr>
+	<tr><th>Builder name</th><th>Stores</th><th>Notes</th></tr>
+	<tr><td>Text (<code>text</code>)</td><td>String, <em>single line</em> or <em>multiple lines</em> (a setting, not a separate type)</td><td>Set Searchable to <em>Keyword</em> when you want to filter/sort on it</td></tr>
+	<tr><td>Rich Text (<code>rich_text</code>)</td><td>CKEditor HTML</td><td>The article body. It replaced 7.3's "HTML" field. Avoid it for anything you need to style precisely</td></tr>
+	<tr><td>Image (<code>image</code>)</td><td>JSON reference to a <a href="documents-media.html">Document</a> plus alt text</td><td>Stored as a reference, not a copy, so a new version of the document shows up in every article</td></tr>
+	<tr><td>Upload (<code>document_library</code>)</td><td>File reference</td><td>PDFs, attachments</td></tr>
+	<tr><td>Web Content (<code>journal_article</code>)</td><td>Reference to another article</td><td>The closest thing to a relationship: one-way and not queryable</td></tr>
+	<tr><td>Link to Page (<code>link_to_layout</code>)</td><td>Page reference</td><td>Survives page renames. A raw text URL does not</td></tr>
+	<tr><td>Date, Numeric (integer or decimal), Boolean</td><td>Typed scalars</td><td>Typed values sort and filter correctly. A date in a Text field does not. Boolean was added to the builder in 7.4 U23</td></tr>
+	<tr><td>Select from List, Single Selection, Multiple Selection, Grid</td><td>Enumerated choice</td><td>Options are defined in the structure itself, and articles store the option <em>value</em>. Renaming the label is safe, but changing the value orphans stored choices. For a list editors maintain, use <a href="taxonomy.html">categories</a></td></tr>
+	<tr><td>Geolocation, Color, Separator</td><td>Specialised / layout-only</td><td>Rarely load-bearing</td></tr>
 </table></div>
 
-<h3>Repeatable fields and field sets</h3>
-<p>Any field can be marked <b>repeatable</b>, which turns it into a list the editor can add rows to. Group several fields into a <b>field set</b> and make the set repeatable to get a repeating record &mdash; for example a <em>Link</em> field set of <code>label</code> + <code>url</code>, repeated to build a nav block.</p>
+<h3>Repeatable fields, fields groups and fieldsets</h3>
+<p>Any field can be marked <b>repeatable</b>, which turns it into a list the editor can add rows to. Drop one field onto another in the builder to create a <b>fields group</b>, then make the group repeatable to get a repeating record. For example, a <em>Link</em> group of <code>label</code> + <code>url</code>, repeated, builds a nav block.</p>
+<p>A <b>fieldset</b> is a different thing: a reusable block of fields shared by <em>several</em> structures (an "SEO" block or an "Author" block, say). Editing a fieldset changes every structure that uses it at once, and Liferay warns you if content already uses it. That is powerful and also a large blast radius, so treat a fieldset edit like a change to every structure it appears in.</p>
 <div class="callout note">
 	<b>Repeatable vs an Object</b>
 	<p>Repeatable field sets are fine for a handful of rows that belong to <em>this one article</em>. The moment those rows need their own permissions, their own URLs, or to be queried independently, they are records &mdash; use an <a href="objects.html">Object</a> with a relationship instead.</p>
@@ -37,16 +52,60 @@
 <h2>Structure vs Object &mdash; the honest comparison</h2>
 <div class="wrap"><table>
 	<tr><th></th><th>Content Structure</th><th><a href="objects.html">Object Definition</a></th></tr>
-	<tr><td>Built by</td><td>Content authors, in Site Admin</td><td>Admins/developers, in Control Panel or API</td></tr>
-	<tr><td>Versioning per record</td><td>Yes</td><td>No</td></tr>
-	<tr><td>Per-locale values</td><td>Yes, built in</td><td>Not per field</td></tr>
-	<tr><td>Relationships between records</td><td>No</td><td>Yes (one-to-many, many-to-many)</td></tr>
-	<tr><td>Validation rules</td><td>Required/regex only</td><td>Expression rules + <a href="client-extensions.html#objectvalidationrule">CET rules</a></td></tr>
+	<tr><td>Built by</td><td>Site admins / power editors, in Site Menu &rarr; Web Content &rarr; Structures</td><td>Admins/developers, in Control Panel &rarr; Objects or API</td></tr>
+	<tr><td>Versioning per record</td><td>Yes (compare, restore)</td><td>No on classic 2026.Q2. Entry versioning only comes with the new CMS flag</td></tr>
+	<tr><td>Per-locale values</td><td>Yes, per field, with translation UI and XLIFF</td><td>Per field ("Localizable") since 2023.Q3. No translation workflow</td></tr>
+	<tr><td>Relationships between records</td><td>One-way reference fields only (Web Content, Image, Link to Page)</td><td>Yes (one-to-many, many-to-many), queryable both ways</td></tr>
+	<tr><td>Validation rules</td><td>Required, plus simple per-field checks</td><td>Expression rules + <a href="client-extensions.html#objectvalidationrule">CET rules</a></td></tr>
 	<tr><td>Lifecycle actions on save</td><td>Via workflow only</td><td><a href="workflow.html#actions">Object actions</a> on create/update/delete</td></tr>
-	<tr><td>Queryable REST collection</td><td><code>/o/headless-delivery/…/structured-contents</code></td><td><code>/o/c/&lt;plural&gt;</code> with OData filters</td></tr>
-	<tr><td>Storage</td><td>XML blob of field values</td><td>Real database columns</td></tr>
+	<tr><td>Queryable REST collection</td><td><code>/o/headless-delivery/v1.0/content-structures/{id}/structured-contents</code>, filtering only on keyword-indexed fields</td><td><code>/o/c/&lt;plural&gt;</code> with OData filters on any field</td></tr>
+	<tr><td>Storage</td><td>Generic rows in the <code>DDMField</code>/<code>DDMFieldAttribute</code> tables, serialized to the familiar XML at the API edge</td><td>Real database columns (one table per object)</td></tr>
 </table></div>
 <p>Short version: <b>structures are for editorial content, objects are for data</b>. If a human writes it and another human proofreads it, structure. If a system reads it and filters it, object.</p>
+
+<h2>What a structure looks like in source</h2>
+<p>In a <a href="site-initializers.html">site initializer</a>, structures live in <code>ddm-structures/*.xml</code>: an XML wrapper around the same JSON the builder exports. This is abridged from Liferay's teaser-showcase initializer:</p>
+<pre><code>ddm-structures/leadership-profile.xml
+&lt;root&gt;
+	&lt;structure&gt;
+		&lt;name&gt;Leadership Profile&lt;/name&gt;   &lt;!-- also becomes the structure KEY --&gt;
+		&lt;description&gt;&lt;/description&gt;
+		&lt;definition&gt;&lt;![CDATA[{
+			"availableLanguageIds": ["en_US"],
+			"defaultLanguageId": "en_US",
+			"definitionSchemaVersion": "2.0",
+			"fields": [
+				{
+					"name": "name",
+					"fieldReference": "name",
+					"type": "text",
+					"dataType": "string",
+					"displayStyle": "singleline",
+					"indexType": "keyword",
+					"localizable": true,
+					"repeatable": false,
+					"required": true,
+					"label": {"en_US": "Name"}
+				},
+				{
+					"name": "bio",
+					"fieldReference": "bio",
+					"type": "rich_text",
+					"dataType": "string",
+					"indexType": "text",
+					"localizable": true,
+					"label": {"en_US": "Bio"}
+				}
+			]
+		}]]&gt;&lt;/definition&gt;
+	&lt;/structure&gt;
+&lt;/root&gt;</code></pre>
+<p>Three things follow from how the importer treats this file:</p>
+<ul>
+	<li>The <code>&lt;name&gt;</code> is used verbatim as the structure key. That is why the article JSON says <code>"ddmStructureKey": "Leadership Profile"</code> with a space in it. Renaming it in source creates a <em>second</em> structure rather than renaming the first.</li>
+	<li>If a structure with that key exists, it is <b>updated in place</b> on reprovision. Delete a field from the XML, reprovision, and it is gone from the live structure too (see the trap below).</li>
+	<li>An optional <code>&lt;layout&gt;</code> element holds the builder's page/row/column layout. Leave it out and Liferay stacks the fields in order.</li>
+</ul>
 
 <h2>How it connects</h2>
 <ul class="rel">
@@ -67,13 +126,13 @@
 <h2>Traps</h2>
 <div class="callout trap">
 	<b>Field reference, not field label</b>
-	<p>Templates and fragment mappings bind to the field's <b>reference</b> (its stable key), not its display label. Renaming the label is safe; changing the reference silently breaks every template and mapping that used it, with no build error &mdash; the value simply renders empty.</p>
+	<p>Templates and fragment mappings bind to the field's <b>reference</b> (its stable key), not its display label. Renaming the label is safe. Changing the reference silently breaks every template and mapping that used it, with no build error: the value just renders empty. The builder gives every new field a <em>random</em> reference (something like <code>Text12345678</code>), so rename it to something meaningful <b>before</b> anyone writes a template against it. Once one exists, that name is fixed.</p>
 </div>
 <div class="callout trap">
 	<b>Deleting a field deletes the data</b>
-	<p>Existing articles store values keyed by field reference in their XML. Remove the field from the structure and those values become unreachable. Treat structure changes on a live site as a data migration.</p>
+	<p>Existing articles store values keyed by field reference. Remove the field from the structure, whether in the UI or by deleting it from <code>ddm-structures/*.xml</code> and reprovisioning, and those values become unreachable from editors and templates. Treat structure changes on a live site as a data migration: add the new field, copy values across (headless API or script), switch the templates over, and only then remove the old field.</p>
 </div>
 <div class="callout warn">
 	<b>Indexing matters for collections</b>
-	<p><code>index-type="keyword"</code> makes a field filterable and sortable; <code>index-type="text"</code> makes it full-text searchable. A field indexed the wrong way will not be offered as a sort or filter option in a <a href="collections.html">dynamic collection</a>, and the cause is invisible in the UI.</p>
+	<p>The <b>Searchable</b> setting (JSON <code>indexType</code>, XML <code>index-type</code>) is <em>Disable</em>, <em>Keyword</em> or <em>Text</em>. <em>Keyword</em> indexes the whole value as one token, which is what exact-match filtering and sorting need. <em>Text</em> tokenizes it for full-text search. <em>Disable</em> keeps it out of the index entirely. The headless <code>contentFields/&lt;ref&gt; eq '…'</code> filter only works on keyword fields, and a field that isn't indexed can't drive a collection's <em>Filter by Field</em> or sort. None of this shows in the editor UI, so decide per field when you create it. Changing it later needs a reindex before existing articles behave.</p>
 </div>
